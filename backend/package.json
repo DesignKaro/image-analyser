@@ -1,0 +1,15 @@
+{
+  "name": "image-analyser-backend",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Node backend for Image Analyser extension",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node --watch server.mjs",
+    "store-key": "bash ./store-key.sh"
+  }
+}

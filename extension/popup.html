@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Analyser</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <h1 class="title">Image Analyser</h1>
+      <p class="subtitle">Click images on pages to generate descriptions.</p>
+
+      <label class="toggle-row" for="enabledToggle">
+        <span class="toggle-text">Enable image analysis</span>
+        <input id="enabledToggle" class="toggle-input" type="checkbox" />
+        <span class="toggle-switch" aria-hidden="true"></span>
+      </label>
+
+      <label class="field-label" for="backendUrl">Backend base URL</label>
+      <div class="backend-row">
+        <input
+          id="backendUrl"
+          class="backend-input"
+          type="url"
+          spellcheck="false"
+          placeholder="http://127.0.0.1:8787"
+        />
+        <button id="saveBackend" class="btn btn-primary" type="button">Save</button>
+      </div>
+
+      <div class="actions-row">
+        <button id="testBackend" class="btn" type="button">Test backend</button>
+      </div>
+
+      <p class="hint">Local default: <code>http://127.0.0.1:8787</code></p>
+      <p id="status" class="status" aria-live="polite"></p>
+      <p id="error" class="error" aria-live="polite"></p>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

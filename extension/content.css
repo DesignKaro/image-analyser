@@ -1,0 +1,134 @@
+html.ia-enabled img {
+  cursor: zoom-in !important;
+}
+
+html.ia-enabled [style*="background-image"] {
+  cursor: zoom-in !important;
+}
+
+#ia-overlay-root {
+  all: initial;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2147483647;
+  width: min(420px, calc(100vw - 24px));
+  display: none;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  pointer-events: none;
+  color-scheme: light;
+}
+
+#ia-overlay-root.ia-visible {
+  display: block;
+}
+
+#ia-overlay-root .ia-card {
+  pointer-events: auto;
+  border-radius: 12px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  box-shadow:
+    0 12px 28px rgba(15, 23, 42, 0.2),
+    0 2px 8px rgba(15, 23, 42, 0.18);
+  color: #0f172a;
+  overflow: hidden;
+}
+
+#ia-overlay-root .ia-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+#ia-overlay-root .ia-state-pill {
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #0f766e;
+  background: #ccfbf1;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  padding: 5px 8px;
+}
+
+#ia-overlay-root[data-state="error"] .ia-state-pill {
+  color: #b91c1c;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+#ia-overlay-root[data-state="success"] .ia-state-pill {
+  color: #166534;
+  background: #dcfce7;
+  border-color: #bbf7d0;
+}
+
+#ia-overlay-root .ia-close {
+  width: 24px;
+  height: 24px;
+  margin: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#ia-overlay-root .ia-close:hover {
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
+#ia-overlay-root .ia-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px;
+}
+
+#ia-overlay-root .ia-spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #bae6fd;
+  border-top-color: #0369a1;
+  margin-top: 2px;
+  animation: ia-spin 0.7s linear infinite;
+  flex: 0 0 auto;
+}
+
+#ia-overlay-root[data-state="loading"] .ia-body {
+  color: #0c4a6e;
+}
+
+#ia-overlay-root[data-state="error"] .ia-body {
+  color: #991b1b;
+}
+
+#ia-overlay-root .ia-text {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+@keyframes ia-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #ia-overlay-root .ia-spinner {
+    animation-duration: 1.8s;
+  }
+}
