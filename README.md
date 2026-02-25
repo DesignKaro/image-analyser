@@ -86,6 +86,28 @@ Request body:
 
 `imageDataUrl` is preferred when available.
 
+## Pushing to GitHub
+
+The project is already a git repo with an initial commit. To create a new GitHub repository and push:
+
+1. **Log in to GitHub CLI** (one-time):
+   ```bash
+   gh auth login
+   ```
+   Follow the prompts (browser or token).
+
+2. **Create the repo and push** from the project root:
+   ```bash
+   cd "/Users/abhisheksingh/Desktop/Image Analyser"
+   gh repo create image-analyser --public --source=. --remote=origin --push
+   ```
+   Or create a repo manually on [github.com/new](https://github.com/new) named `image-analyser`, then:
+   ```bash
+   git remote add origin https://github.com/YOUR_USERNAME/image-analyser.git
+   git branch -M main
+   git push -u origin main
+   ```
+
 ## Troubleshooting
 
 - If you see `Extension context invalidated`, reload the web page once (or open the page in a new tab) and try again.
