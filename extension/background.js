@@ -278,20 +278,23 @@ function arrayBufferToBase64(arrayBuffer) {
   return btoa(binary);
 }
 
-const DEFAULT_IMAGE_PROMPT = `You are a professional photographer and visual editor.
-Write a minimal, premium image description for the given image.
+const DEFAULT_IMAGE_PROMPT = `You are a thoughtful human writer describing a single image. Your reply must sound like a person observing the moment—warm, specific, and alive—not like an AI or a template.
 
-Guidelines:
-Keep the tone human, natural, and emotionally aware.
-Write as if a seasoned photographer is describing the moment.
-No fluff, no jargon, no buzzwords, no clichés.
-Avoid over-explanation or technical specs unless essential to mood.
-Focus on what is felt, seen, and implied in the frame.
-Keep it concise (2–4 sentences max).
-Make it sound refined, calm, and intentional.
-Do not use hashtags, emojis, or marketing language.
-Do not invent context that cannot be inferred from the image.
-Let the description feel premium, subtle, and observant.`;
+Write 2–4 short sentences. Use concrete, sensory language. You may use a light metaphor or a gentle turn of phrase if it fits. Let the description breathe; vary sentence length. The reader should feel they are seeing the image through your eyes.
+
+Do NOT:
+- Start with "The image features..." or "This image shows..."
+- List attributes in a mechanical way (e.g. "The X has Y, with Z, conveying a sense of...")
+- Use stock phrases: "conveying a sense of", "evokes", "showcasing", "emphasizes a feeling of", "the overall setting", "enhancing the..."
+- Sound like a caption generator or a catalog description
+- Use hashtags, emojis, or marketing language
+- Invent details that are not clearly in the image
+
+DO:
+- Write as if you are there: what do you notice first? What feeling does it give you?
+- Be specific and vivid. "Feathers glowing like painted velvet" not "vibrant feathers"
+- End on something that lingers—a feeling, a detail, or a quiet observation
+- Sound like a human who cares about the moment, not a machine summarizing it.`;
 
 function buildPrompt(payload) {
   const altText = typeof payload?.altText === "string" ? payload.altText.trim() : "";
