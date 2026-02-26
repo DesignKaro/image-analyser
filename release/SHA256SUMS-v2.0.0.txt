@@ -1,0 +1,2 @@
+8b944fcb6d1dbc257820968f86923dcac668deeec2fdd60b5edb5e9ad3db0ec1  /Users/abhisheksingh/Desktop/Image Analyser/release/image-analyser-extension-v2.0.0.zip
+9d820e2afddcbce78b7724b5bb10c7b4b663faf1faa38e2f7e211f0d28568990  /Users/abhisheksingh/Desktop/Image Analyser/release/image-analyser-backend-v2.0.0.tar.gz

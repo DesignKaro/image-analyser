@@ -7,6 +7,7 @@ const INIT_FLAG = "__IA_CONTENT_INITIALIZED__";
 let isEnabled = false;
 let activeRequestId = 0;
 let hideTimer = null;
+let copyFeedbackTimer = null;
 
 if (window[INIT_FLAG]) {
   syncEnabledState().catch((error) => {
@@ -118,10 +119,11 @@ async function onDocumentClick(event) {
   event.stopPropagation();
   event.stopImmediatePropagation();
 
+  const payload = await createImagePayload(target);
+
   showOverlay({ state: "loading", text: "Analysing image..." }, anchor);
 
   try {
-    const payload = await createImagePayload(target);
     const response = await sendRuntimeMessage({
       type: "analyze-image",
       payload
@@ -405,6 +407,11 @@ function showOverlay(payload, anchor) {
   root.dataset.state = payload.state;
   spinner.hidden = payload.state !== "loading";
 
+  const headerActions = root.querySelector(".ia-header-actions");
+  if (headerActions) {
+    headerActions.hidden = payload.state === "loading";
+  }
+
   if (payload.state === "loading") {
     statusPill.textContent = "Working";
   } else if (payload.state === "error") {
@@ -426,9 +433,14 @@ function scheduleOverlayHide(delayMs) {
 
 function hideOverlay() {
   clearTimeout(hideTimer);
+  clearTimeout(copyFeedbackTimer);
   const root = document.getElementById(OVERLAY_ID);
   if (!root) {
     return;
+  }
+  const copiedBadge = root.querySelector(".ia-copied-badge");
+  if (copiedBadge) {
+    copiedBadge.hidden = true;
   }
   root.classList.remove("ia-visible");
 }
@@ -445,6 +457,12 @@ function ensureOverlay() {
     <div class="ia-card" role="status" aria-live="polite">
       <div class="ia-header">
         <span class="ia-state-pill">Working</span>
+        <div class="ia-header-actions">
+          <button type="button" class="ia-btn-icon ia-copy" aria-label="Copy output" title="Copy output">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          </button>
+          <span class="ia-copied-badge" hidden>Copied</span>
+        </div>
         <button type="button" class="ia-close" aria-label="Close">&times;</button>
       </div>
       <div class="ia-body">
@@ -460,6 +478,27 @@ function ensureOverlay() {
       event.preventDefault();
       event.stopPropagation();
       hideOverlay();
+    });
+  }
+
+  const copyButton = root.querySelector(".ia-copy");
+  if (copyButton) {
+    copyButton.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const textEl = root.querySelector(".ia-text");
+      const textToCopy = textEl?.textContent?.trim() || "";
+      if (!textToCopy) {
+        return;
+      }
+
+      const copied = await copyTextToClipboard(textToCopy);
+      if (!copied) {
+        return;
+      }
+
+      showCopiedFeedback(root);
     });
   }
 
@@ -491,6 +530,62 @@ function positionOverlay(root, anchor) {
 
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
+}
+
+function showCopiedFeedback(root) {
+  const copyButton = root.querySelector(".ia-copy");
+  if (copyButton) {
+    copyButton.setAttribute("aria-label", "Copied");
+    copyButton.setAttribute("title", "Copied");
+  }
+
+  const copiedBadge = root.querySelector(".ia-copied-badge");
+  if (copiedBadge) {
+    copiedBadge.hidden = false;
+  }
+
+  clearTimeout(copyFeedbackTimer);
+  copyFeedbackTimer = setTimeout(() => {
+    if (copyButton) {
+      copyButton.setAttribute("aria-label", "Copy output");
+      copyButton.setAttribute("title", "Copy output");
+    }
+    if (copiedBadge) {
+      copiedBadge.hidden = true;
+    }
+  }, 1500);
+}
+
+async function copyTextToClipboard(text) {
+  if (!text) {
+    return false;
+  }
+
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      // Fallback below.
+    }
+  }
+
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    textarea.style.pointerEvents = "none";
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, text.length);
+    const success = document.execCommand("copy");
+    textarea.remove();
+    return Boolean(success);
+  } catch {
+    return false;
+  }
 }
 
 function toUserError(error) {

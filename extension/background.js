@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:8787";
+const DEFAULT_BACKEND_URL = "https://img.connectiqworld.cloud/backend";
 const OPENAI_MODEL = "gpt-4o-mini";
 const ENABLED_KEY = "enabled";
 const BACKEND_URL_KEY = "backendUrl";
@@ -106,6 +106,10 @@ function normalizeBackendUrl(rawUrl) {
     throw new Error("Backend URL must use http or https.");
   }
 
+  if (parsed.hostname === "img.connectiqworld.cloud" && parsed.protocol === "http:") {
+    parsed.protocol = "https:";
+  }
+
   const path = parsed.pathname.replace(/\/+$/, "");
   return `${parsed.origin}${path && path !== "/" ? path : ""}`;
 }
@@ -127,7 +131,8 @@ async function checkBackendHealth() {
     if (error?.name === "AbortError") {
       throw new Error("Backend health check timed out.");
     }
-    throw new Error(`Could not reach backend at ${backendUrl}.`);
+    const detail = normalizeNetworkErrorDetail(error, backendUrl);
+    throw new Error(`Could not reach backend at ${backendUrl}.${detail}`);
   }
 
   clearTimeout(timeout);
@@ -273,13 +278,27 @@ function arrayBufferToBase64(arrayBuffer) {
   return btoa(binary);
 }
 
+const DEFAULT_IMAGE_PROMPT = `You are a professional photographer and visual editor.
+Write a minimal, premium image description for the given image.
+
+Guidelines:
+Keep the tone human, natural, and emotionally aware.
+Write as if a seasoned photographer is describing the moment.
+No fluff, no jargon, no buzzwords, no clichés.
+Avoid over-explanation or technical specs unless essential to mood.
+Focus on what is felt, seen, and implied in the frame.
+Keep it concise (2–4 sentences max).
+Make it sound refined, calm, and intentional.
+Do not use hashtags, emojis, or marketing language.
+Do not invent context that cannot be inferred from the image.
+Let the description feel premium, subtle, and observant.`;
+
 function buildPrompt(payload) {
   const altText = typeof payload?.altText === "string" ? payload.altText.trim() : "";
   if (!altText) {
-    return "Describe this image in concise sentences. Mention key objects, setting, and notable details.";
+    return DEFAULT_IMAGE_PROMPT;
   }
-
-  return `Describe this image in concise sentences. Mention key objects, setting, and notable details. Context alt text: "${altText}"`;
+  return `${DEFAULT_IMAGE_PROMPT}\n\nContext (alt text from page): "${altText}"`;
 }
 
 async function requestVisionDescription({ backendUrl, prompt, imageDataUrl, imageUrl, pageUrl }) {
@@ -307,9 +326,8 @@ async function requestVisionDescription({ backendUrl, prompt, imageDataUrl, imag
     if (error?.name === "AbortError") {
       throw new Error("Backend request timed out. Try again.");
     }
-    throw new Error(
-      `Could not reach backend at ${backendUrl}. Start backend locally or update backend URL in popup.`
-    );
+    const detail = normalizeNetworkErrorDetail(error, backendUrl);
+    throw new Error(`Could not reach backend at ${backendUrl}.${detail}`);
   }
 
   clearTimeout(timeout);
@@ -339,6 +357,33 @@ function extractDescription(payload) {
 function toUserError(error) {
   const message = typeof error?.message === "string" ? error.message.trim() : "";
   return message || "Image analysis failed.";
+}
+
+function normalizeNetworkErrorDetail(error, backendUrl) {
+  const message = typeof error?.message === "string" ? error.message.trim() : "";
+  const insecureRemoteUrl =
+    typeof backendUrl === "string" &&
+    backendUrl.startsWith("http://") &&
+    !backendUrl.startsWith("http://127.0.0.1") &&
+    !backendUrl.startsWith("http://localhost");
+
+  if (insecureRemoteUrl && (!message || /failed to fetch/i.test(message))) {
+    return " Browser likely blocked remote HTTP (or HSTS upgraded it). Use HTTPS with a valid certificate for this host.";
+  }
+
+  if (!message) {
+    return " Check backend URL and ensure server is running.";
+  }
+
+  if (/ERR_CERT|certificate|SSL|TLS/i.test(message)) {
+    return ` SSL/certificate issue: ${message}`;
+  }
+
+  if (/mixed content|blocked/i.test(message)) {
+    return ` Browser blocked insecure request: ${message}`;
+  }
+
+  return ` ${message}`;
 }
 
 function storageGet(defaults) {

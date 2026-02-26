@@ -46,6 +46,67 @@ html.ia-enabled [style*="background-image"] {
 }
 
 #ia-overlay-root .ia-state-pill {
+  flex-shrink: 0;
+}
+
+#ia-overlay-root .ia-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+#ia-overlay-root[data-state="loading"] .ia-header-actions {
+  display: none !important;
+}
+
+#ia-overlay-root[data-state="success"] .ia-header-actions,
+#ia-overlay-root[data-state="error"] .ia-header-actions {
+  display: flex !important;
+}
+
+#ia-overlay-root .ia-btn-icon {
+  width: 28px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#ia-overlay-root .ia-btn-icon:hover {
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
+#ia-overlay-root .ia-btn-icon svg {
+  flex: 0 0 auto;
+  color: inherit;
+}
+
+#ia-overlay-root .ia-btn-icon svg path,
+#ia-overlay-root .ia-btn-icon svg polyline,
+#ia-overlay-root .ia-btn-icon svg rect {
+  stroke: currentColor;
+}
+
+#ia-overlay-root .ia-copied-badge {
+  font-size: 0.7rem;
+  line-height: 1;
+  color: #065f46;
+  background: #d1fae5;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 4px 7px;
+}
+
+#ia-overlay-root .ia-state-pill {
   font-size: 0.72rem;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -70,6 +131,7 @@ html.ia-enabled [style*="background-image"] {
 }
 
 #ia-overlay-root .ia-close {
+  flex-shrink: 0;
   width: 24px;
   height: 24px;
   margin: 0;

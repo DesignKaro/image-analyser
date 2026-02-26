@@ -72,12 +72,27 @@ server.listen(PORT, HOST, () => {
   console.log(`Image Analyser backend running at http://${HOST}:${PORT}`);
 });
 
+const DEFAULT_IMAGE_PROMPT = `You are a professional photographer and visual editor.
+Write a minimal, premium image description for the given image.
+
+Guidelines:
+Keep the tone human, natural, and emotionally aware.
+Write as if a seasoned photographer is describing the moment.
+No fluff, no jargon, no buzzwords, no clichés.
+Avoid over-explanation or technical specs unless essential to mood.
+Focus on what is felt, seen, and implied in the frame.
+Keep it concise (2–4 sentences max).
+Make it sound refined, calm, and intentional.
+Do not use hashtags, emojis, or marketing language.
+Do not invent context that cannot be inferred from the image.
+Let the description feel premium, subtle, and observant.`;
+
 function buildPrompt(rawPrompt) {
   if (typeof rawPrompt === "string" && rawPrompt.trim()) {
     return rawPrompt.trim();
   }
 
-  return "Describe this image in concise sentences. Mention key objects, setting, and notable details.";
+  return DEFAULT_IMAGE_PROMPT;
 }
 
 function resolveImageInput(imageDataUrl, imageUrl) {

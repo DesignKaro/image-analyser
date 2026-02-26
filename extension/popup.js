@@ -1,11 +1,6 @@
 const ENABLED_KEY = "enabled";
-const BACKEND_URL_KEY = "backendUrl";
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:8787";
 
 const enabledToggle = document.getElementById("enabledToggle");
-const backendUrlInput = document.getElementById("backendUrl");
-const saveBackendButton = document.getElementById("saveBackend");
-const testBackendButton = document.getElementById("testBackend");
 const statusEl = document.getElementById("status");
 const errorEl = document.getElementById("error");
 
@@ -14,28 +9,14 @@ init().catch((error) => {
 });
 
 async function init() {
-  const stored = await storageGet({
-    [ENABLED_KEY]: false,
-    [BACKEND_URL_KEY]: DEFAULT_BACKEND_URL
-  });
-
+  const stored = await storageGet({ [ENABLED_KEY]: false });
   const enabled = Boolean(stored[ENABLED_KEY]);
-  const backendUrl = safeNormalize(stored[BACKEND_URL_KEY], DEFAULT_BACKEND_URL);
 
   enabledToggle.checked = enabled;
-  backendUrlInput.value = backendUrl;
   setStatus(enabled ? "Image analysis is ON." : "Image analysis is OFF.");
   clearError();
 
   enabledToggle.addEventListener("change", onToggleChanged);
-  saveBackendButton.addEventListener("click", onSaveBackendClicked);
-  testBackendButton.addEventListener("click", onTestBackendClicked);
-  backendUrlInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      onSaveBackendClicked();
-    }
-  });
 }
 
 async function onToggleChanged(event) {
@@ -59,81 +40,6 @@ async function onToggleChanged(event) {
     sendRuntimeMessage({ type: "toggle-enabled", enabled }).catch(() => {});
   } catch (error) {
     showError(`Could not save preference: ${error.message}`);
-  }
-}
-
-async function onSaveBackendClicked() {
-  clearError();
-
-  try {
-    const backendUrl = normalizeBackendUrl(backendUrlInput.value);
-    const response = await sendRuntimeMessage({
-      type: "set-backend-url",
-      payload: { backendUrl }
-    });
-
-    if (!response?.ok) {
-      throw new Error(response?.error || "Could not save backend URL.");
-    }
-
-    backendUrlInput.value = response.backendUrl;
-    setStatus(`Backend URL saved: ${response.backendUrl}`);
-  } catch (error) {
-    showError(`Invalid backend URL: ${error.message}`);
-  }
-}
-
-async function onTestBackendClicked() {
-  clearError();
-
-  try {
-    const backendUrl = normalizeBackendUrl(backendUrlInput.value);
-    const setResponse = await sendRuntimeMessage({
-      type: "set-backend-url",
-      payload: { backendUrl }
-    });
-
-    if (!setResponse?.ok) {
-      throw new Error(setResponse?.error || "Could not save backend URL.");
-    }
-
-    const response = await sendRuntimeMessage({ type: "check-backend-health" });
-    if (!response?.ok) {
-      throw new Error(response?.error || "Backend health check failed.");
-    }
-
-    backendUrlInput.value = response.backendUrl;
-    setStatus(response.message || "Backend is reachable.");
-  } catch (error) {
-    showError(error.message || "Backend health check failed.");
-  }
-}
-
-function normalizeBackendUrl(rawUrl) {
-  if (typeof rawUrl !== "string" || !rawUrl.trim()) {
-    throw new Error("Backend URL is required.");
-  }
-
-  let parsed;
-  try {
-    parsed = new URL(rawUrl.trim());
-  } catch {
-    throw new Error("Enter a valid URL.");
-  }
-
-  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    throw new Error("URL must start with http:// or https://.");
-  }
-
-  const path = parsed.pathname.replace(/\/+$/, "");
-  return `${parsed.origin}${path && path !== "/" ? path : ""}`;
-}
-
-function safeNormalize(value, fallback) {
-  try {
-    return normalizeBackendUrl(value);
-  } catch {
-    return fallback;
   }
 }
 

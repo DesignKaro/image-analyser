@@ -57,6 +57,7 @@ curl http://127.0.0.1:8787/health
 3. Click **Test backend**
 4. Enable **Image analysis**
 5. Open any page and click an image
+6. In result overlay header, use **copy** (copies generated output). A **Copied** badge appears on success.
 
 ## Deploy Backend on VPS
 
