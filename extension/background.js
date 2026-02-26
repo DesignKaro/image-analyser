@@ -1,4 +1,5 @@
-const DEFAULT_BACKEND_URL = "https://img.connectiqworld.cloud/backend";
+// Live backend (switch back when needed): "https://img.connectiqworld.cloud/backend"
+const DEFAULT_BACKEND_URL = "http://127.0.0.1:8787";
 const OPENAI_MODEL = "gpt-4o-mini";
 const ENABLED_KEY = "enabled";
 const BACKEND_URL_KEY = "backendUrl";
