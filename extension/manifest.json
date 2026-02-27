@@ -14,7 +14,7 @@
     "<all_urls>",
     "http://localhost/*",
     "http://127.0.0.1/*",
-    "https://img.connectiqworld.cloud/*"
+    "https://img.connectiqworld.cloud/*","https://imagetopromptgenerator.one/*"
   ],
   "background": {
     "service_worker": "background.js"

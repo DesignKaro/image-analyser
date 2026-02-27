@@ -1,5 +1,6 @@
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8787";
 const LEGACY_LIVE_BACKEND_URL = "https://img.connectiqworld.cloud/backend";
+const LIVE_BACKEND_URL = "https://imagetopromptgenerator.one/backend";
 const OPENAI_MODEL = "gpt-4o-mini";
 const ENABLED_KEY = "enabled";
 const BACKEND_URL_KEY = "backendUrl";
@@ -12,7 +13,7 @@ const MAX_FETCH_BYTES = 15 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 20000;
 const BACKEND_TIMEOUT_MS = 45000;
 const LOCALHOST_WEB_APP_URL = "http://localhost:3000";
-const LIVE_WEB_APP_URL = "https://img.connectiqworld.cloud";
+const LIVE_WEB_APP_URL = "https://imagetopromptgenerator.one";
 const GOOGLE_WEB_LOGIN_TIMEOUT_MS = 4 * 60 * 1000;
 const GOOGLE_WEB_LOGIN_POLL_MS = 1200;
 
@@ -20,7 +21,7 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.local.get(
     {
       [ENABLED_KEY]: false,
-      [BACKEND_URL_KEY]: DEFAULT_BACKEND_URL
+      [BACKEND_URL_KEY]: LIVE_BACKEND_URL
     },
     (stored) => {
       const patch = {};
@@ -32,9 +33,9 @@ chrome.runtime.onInstalled.addListener(() => {
       try {
         const normalized = normalizeBackendUrl(stored[BACKEND_URL_KEY]);
         patch[BACKEND_URL_KEY] =
-          normalized === LEGACY_LIVE_BACKEND_URL ? DEFAULT_BACKEND_URL : normalized;
+          normalized === LEGACY_LIVE_BACKEND_URL ? LIVE_BACKEND_URL : normalized;
       } catch {
-        patch[BACKEND_URL_KEY] = DEFAULT_BACKEND_URL;
+        patch[BACKEND_URL_KEY] = LIVE_BACKEND_URL;
       }
 
       if (Object.keys(patch).length) {
@@ -198,7 +199,7 @@ async function setBackendUrl(rawUrl) {
 }
 
 async function getBackendUrl() {
-  const stored = await storageGet({ [BACKEND_URL_KEY]: DEFAULT_BACKEND_URL });
+  const stored = await storageGet({ [BACKEND_URL_KEY]: LIVE_BACKEND_URL });
   return normalizeBackendUrl(stored[BACKEND_URL_KEY]);
 }
 
@@ -218,7 +219,7 @@ function normalizeBackendUrl(rawUrl) {
     throw new Error("Backend URL must use http or https.");
   }
 
-  if (parsed.hostname === "img.connectiqworld.cloud" && parsed.protocol === "http:") {
+  if ((parsed.hostname === "img.connectiqworld.cloud" || parsed.hostname === "imagetopromptgenerator.one") && parsed.protocol === "http:") {
     parsed.protocol = "https:";
   }
 
@@ -409,7 +410,7 @@ function resolveWebAppUrlFromBackend(backendUrl) {
     return parsed.toString();
   }
 
-  if (parsed.hostname === "img.connectiqworld.cloud") {
+  if (parsed.hostname === "img.connectiqworld.cloud" || parsed.hostname === "imagetopromptgenerator.one") {
     return LIVE_WEB_APP_URL;
   }
 
@@ -602,22 +603,22 @@ async function getExtensionStateSnapshot(options = {}) {
 async function readStoredState() {
   const stored = await storageGet({
     [ENABLED_KEY]: false,
-    [BACKEND_URL_KEY]: DEFAULT_BACKEND_URL,
+    [BACKEND_URL_KEY]: LIVE_BACKEND_URL,
     [AUTH_TOKEN_KEY]: "",
     [AUTH_USER_KEY]: null,
     [AUTH_SUBSCRIPTION_KEY]: null,
     [AUTH_USAGE_KEY]: null
   });
 
-  let backendUrl = DEFAULT_BACKEND_URL;
+  let backendUrl = LIVE_BACKEND_URL;
   try {
     backendUrl = normalizeBackendUrl(stored[BACKEND_URL_KEY]);
     if (backendUrl === LEGACY_LIVE_BACKEND_URL) {
-      backendUrl = DEFAULT_BACKEND_URL;
+      backendUrl = LIVE_BACKEND_URL;
       await storageSet({ [BACKEND_URL_KEY]: backendUrl });
     }
   } catch {
-    backendUrl = DEFAULT_BACKEND_URL;
+    backendUrl = LIVE_BACKEND_URL;
     await storageSet({ [BACKEND_URL_KEY]: backendUrl });
   }
 
@@ -637,7 +638,7 @@ async function readStoredState() {
 function toPublicState(state) {
   return {
     enabled: Boolean(state?.enabled),
-    backendUrl: typeof state?.backendUrl === "string" ? state.backendUrl : DEFAULT_BACKEND_URL,
+    backendUrl: typeof state?.backendUrl === "string" ? state.backendUrl : LIVE_BACKEND_URL,
     isAuthenticated: Boolean(state?.authToken),
     user: normalizeUserSnapshot(state?.user),
     subscription: normalizeSubscriptionSnapshot(state?.subscription),

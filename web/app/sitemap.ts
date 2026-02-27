@@ -33,10 +33,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
 }
 
 function resolveSiteUrl() {
-  const candidate = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://img.connectiqworld.cloud";
+  const candidate = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://imagetopromptgenerator.one";
   try {
     return new URL(candidate).toString().replace(/\/+$/, "");
   } catch {
-    return "https://img.connectiqworld.cloud";
+    return "https://imagetopromptgenerator.one";
   }
 }

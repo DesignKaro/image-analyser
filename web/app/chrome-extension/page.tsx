@@ -26,7 +26,7 @@ const extensionSchema = {
     price: "0",
     priceCurrency: "USD"
   },
-  url: "https://img.connectiqworld.cloud/chrome-extension"
+  url: "https://imagetopromptgenerator.one/chrome-extension"
 };
 
 const EXTENSION_FAQS: { question: string; answer: string }[] = [

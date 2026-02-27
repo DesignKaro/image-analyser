@@ -1,4 +1,4 @@
-export const LIVE_BACKEND_URL = "https://img.connectiqworld.cloud/backend";
+export const LIVE_BACKEND_URL = "https://imagetopromptgenerator.one/backend";
 export const LOCALHOST_BACKEND_URL = "http://127.0.0.1:8787";
 
 export const DEFAULT_BACKEND_URL =

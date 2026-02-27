@@ -41,11 +41,11 @@ export const metadata: Metadata = {
 };
 
 function resolveMetadataBase() {
-  const candidate = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://img.connectiqworld.cloud";
+  const candidate = process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://imagetopromptgenerator.one";
   try {
     return new URL(candidate);
   } catch {
-    return new URL("https://img.connectiqworld.cloud");
+    return new URL("https://imagetopromptgenerator.one");
   }
 }
 

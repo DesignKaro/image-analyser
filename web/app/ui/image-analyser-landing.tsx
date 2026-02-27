@@ -459,7 +459,7 @@ const SEO_COPY: SeoCopySection[] = [
   }
 ];
 
-const SITE_BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://img.connectiqworld.cloud").replace(
+const SITE_BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://imagetopromptgenerator.one").replace(
   /\/+$/,
   ""
 );
