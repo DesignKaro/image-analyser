@@ -60,8 +60,7 @@ html.ia-enabled [style*="background-image"] {
   display: none !important;
 }
 
-#ia-overlay-root[data-state="success"] .ia-header-actions,
-#ia-overlay-root[data-state="error"] .ia-header-actions {
+#ia-overlay-root[data-state="success"] .ia-header-actions {
   display: flex !important;
 }
 
@@ -85,6 +84,11 @@ html.ia-enabled [style*="background-image"] {
   color: #1f2937;
 }
 
+#ia-overlay-root .ia-btn-icon:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 #ia-overlay-root .ia-btn-icon svg {
   flex: 0 0 auto;
   color: inherit;
@@ -96,12 +100,16 @@ html.ia-enabled [style*="background-image"] {
   stroke: currentColor;
 }
 
-#ia-overlay-root .ia-copied-badge {
+#ia-overlay-root .ia-save.is-saved {
+  color: #1d4ed8;
+}
+
+#ia-overlay-root .ia-action-badge {
   font-size: 0.7rem;
   line-height: 1;
-  color: #065f46;
-  background: #d1fae5;
-  border: 1px solid #a7f3d0;
+  color: #1e3a8a;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
   border-radius: 999px;
   padding: 4px 7px;
 }
@@ -111,9 +119,9 @@ html.ia-enabled [style*="background-image"] {
   line-height: 1;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #0f766e;
-  background: #ccfbf1;
-  border: 1px solid #99f6e4;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
   border-radius: 999px;
   padding: 5px 8px;
 }
@@ -125,9 +133,9 @@ html.ia-enabled [style*="background-image"] {
 }
 
 #ia-overlay-root[data-state="success"] .ia-state-pill {
-  color: #166534;
-  background: #dcfce7;
-  border-color: #bbf7d0;
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #bfdbfe;
 }
 
 #ia-overlay-root .ia-close {
@@ -156,6 +164,13 @@ html.ia-enabled [style*="background-image"] {
   padding: 12px;
 }
 
+#ia-overlay-root .ia-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
 #ia-overlay-root .ia-spinner {
   width: 16px;
   height: 16px;
@@ -181,6 +196,17 @@ html.ia-enabled [style*="background-image"] {
   line-height: 1.4;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+#ia-overlay-root .ia-meta {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #475569;
+}
+
+#ia-overlay-root[data-state="error"] .ia-meta {
+  color: #b91c1c;
 }
 
 @keyframes ia-spin {

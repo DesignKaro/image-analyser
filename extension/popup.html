@@ -3,16 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Analyser</title>
+    <title>Image to Prompt</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <main class="popup">
-      <h1 class="title">Image Analyser</h1>
-      <p class="subtitle">Click images on pages to generate descriptions.</p>
+      <header class="popup-header">
+        <div class="brand-row">
+          <img class="brand-icon" src="icons/icon32.png" alt="Image to Prompt logo" />
+          <h1 class="title">Image to Prompt</h1>
+        </div>
+        <p class="subtitle">Sign in, then click any image to generate a prompt.</p>
+      </header>
+
+      <section id="authSignedOut" class="card">
+        <div class="auth-mode-row" role="tablist" aria-label="Authentication mode">
+          <button
+            id="signinTab"
+            class="mode-btn is-active"
+            data-mode="signin"
+            type="button"
+            role="tab"
+            aria-selected="true"
+          >
+            Sign in
+          </button>
+          <button
+            id="signupTab"
+            class="mode-btn"
+            data-mode="signup"
+            type="button"
+            role="tab"
+            aria-selected="false"
+          >
+            Sign up
+          </button>
+        </div>
+
+        <label class="field-label" for="emailInput">Email</label>
+        <input id="emailInput" class="text-input" type="email" autocomplete="email" />
+
+        <label class="field-label" for="passwordInput">Password</label>
+        <input id="passwordInput" class="text-input" type="password" autocomplete="current-password" />
+
+        <button id="authSubmitBtn" class="btn btn-primary" type="button">Sign in</button>
+        <div class="or-row" aria-hidden="true"><span>or</span></div>
+        <button id="googleAuthBtn" class="btn btn-google" type="button">Continue with Google</button>
+      </section>
+
+      <section id="authSignedIn" class="card" hidden>
+        <p id="accountEmail" class="account-email"></p>
+        <p id="planText" class="plan-text"></p>
+        <p id="planStatusText" class="plan-status-text"></p>
+        <p id="creditsAlert" class="credits-alert" hidden></p>
+
+        <div class="usage-meter" aria-hidden="true">
+          <span id="usageMeterBar"></span>
+        </div>
+        <p id="usageText" class="usage-text"></p>
+
+        <div class="button-row">
+          <button id="refreshUsageBtn" class="btn btn-secondary" type="button">Refresh credits</button>
+          <button id="signOutBtn" class="btn btn-secondary" type="button">Sign out</button>
+        </div>
+        <button id="upgradePlanBtn" class="btn btn-primary btn-upgrade" type="button">Upgrade plan</button>
+        <button id="savedPromptsBtn" class="btn btn-secondary btn-saved-prompts" type="button">
+          Saved prompts
+        </button>
+      </section>
 
       <label class="toggle-row" for="enabledToggle">
-        <span class="toggle-text">Enable image analysis</span>
+        <span class="toggle-text">Enable click-to-prompt</span>
         <input id="enabledToggle" class="toggle-input" type="checkbox" />
         <span class="toggle-switch" aria-hidden="true"></span>
       </label>

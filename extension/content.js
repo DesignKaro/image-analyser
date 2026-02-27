@@ -7,16 +7,16 @@ const INIT_FLAG = "__IA_CONTENT_INITIALIZED__";
 let isEnabled = false;
 let activeRequestId = 0;
 let hideTimer = null;
-let copyFeedbackTimer = null;
+let actionFeedbackTimer = null;
 
 if (window[INIT_FLAG]) {
   syncEnabledState().catch((error) => {
-    console.error("[Image Analyser] Sync error:", error);
+    console.error("[Image to Prompt] Sync error:", error);
   });
 } else {
   window[INIT_FLAG] = true;
   bootstrap().catch((error) => {
-    console.error("[Image Analyser] Initialization error:", error);
+    console.error("[Image to Prompt] Initialization error:", error);
   });
 }
 
@@ -119,11 +119,11 @@ async function onDocumentClick(event) {
   event.stopPropagation();
   event.stopImmediatePropagation();
 
-  const payload = await createImagePayload(target);
-
-  showOverlay({ state: "loading", text: "Analysing image..." }, anchor);
+  showOverlay({ state: "loading", text: "Generating prompt..." }, anchor);
 
   try {
+    const payload = await createImagePayload(target);
+
     const response = await sendRuntimeMessage({
       type: "analyze-image",
       payload
@@ -137,7 +137,24 @@ async function onDocumentClick(event) {
       throw new Error(response?.error || "Analysis request failed.");
     }
 
-    showOverlay({ state: "success", text: response.description }, anchor);
+    const promptOutput =
+      typeof response.description === "string" ? response.description.trim() : "";
+    if (!promptOutput) {
+      throw new Error("No prompt output was returned.");
+    }
+
+    showOverlay(
+      {
+        state: "success",
+        text: promptOutput,
+        meta: formatUsageMeta(response.usage),
+        requestId: typeof response.requestId === "string" ? response.requestId : "",
+        model: typeof response.model === "string" ? response.model : "",
+        imageUrl: typeof payload?.url === "string" ? payload.url : "",
+        sourcePageUrl: typeof payload?.pageUrl === "string" ? payload.pageUrl : window.location.href
+      },
+      anchor
+    );
     scheduleOverlayHide(AUTO_HIDE_MS);
   } catch (error) {
     if (requestId !== activeRequestId) {
@@ -396,28 +413,51 @@ function showOverlay(payload, anchor) {
 
   const root = ensureOverlay();
   const textEl = root.querySelector(".ia-text");
+  const metaEl = root.querySelector(".ia-meta");
   const spinner = root.querySelector(".ia-spinner");
   const statusPill = root.querySelector(".ia-state-pill");
 
-  if (!textEl || !spinner || !statusPill) {
+  if (!textEl || !metaEl || !spinner || !statusPill) {
     return;
   }
 
   textEl.textContent = payload.text || "";
+  const metaText = typeof payload.meta === "string" ? payload.meta.trim() : "";
+  metaEl.textContent = metaText;
+  metaEl.hidden = !metaText || payload.state === "loading";
   root.dataset.state = payload.state;
   spinner.hidden = payload.state !== "loading";
 
   const headerActions = root.querySelector(".ia-header-actions");
   if (headerActions) {
-    headerActions.hidden = payload.state === "loading";
+    headerActions.hidden = payload.state !== "success";
   }
 
+  if (payload.state === "success") {
+    const requestId = typeof payload.requestId === "string" ? payload.requestId.trim() : "";
+    root.dataset.requestId = requestId;
+    root.dataset.model = typeof payload.model === "string" ? payload.model.trim() : "";
+    root.dataset.imageUrl = typeof payload.imageUrl === "string" ? payload.imageUrl.trim() : "";
+    root.dataset.sourcePageUrl =
+      typeof payload.sourcePageUrl === "string" ? payload.sourcePageUrl.trim() : "";
+    root.dataset.saved = "0";
+    setSaveButtonState(root, { saved: false, saving: false });
+  } else {
+    root.dataset.requestId = "";
+    root.dataset.model = "";
+    root.dataset.imageUrl = "";
+    root.dataset.sourcePageUrl = "";
+    root.dataset.saved = "0";
+    setSaveButtonState(root, { saved: false, saving: false });
+  }
+  hideActionFeedback(root);
+
   if (payload.state === "loading") {
-    statusPill.textContent = "Working";
+    statusPill.textContent = "Generating";
   } else if (payload.state === "error") {
     statusPill.textContent = "Error";
   } else {
-    statusPill.textContent = "Done";
+    statusPill.textContent = "Prompt";
   }
 
   root.classList.add("ia-visible");
@@ -433,15 +473,12 @@ function scheduleOverlayHide(delayMs) {
 
 function hideOverlay() {
   clearTimeout(hideTimer);
-  clearTimeout(copyFeedbackTimer);
+  clearTimeout(actionFeedbackTimer);
   const root = document.getElementById(OVERLAY_ID);
   if (!root) {
     return;
   }
-  const copiedBadge = root.querySelector(".ia-copied-badge");
-  if (copiedBadge) {
-    copiedBadge.hidden = true;
-  }
+  hideActionFeedback(root);
   root.classList.remove("ia-visible");
 }
 
@@ -458,16 +495,22 @@ function ensureOverlay() {
       <div class="ia-header">
         <span class="ia-state-pill">Working</span>
         <div class="ia-header-actions">
+          <button type="button" class="ia-btn-icon ia-save" aria-label="Save prompt" title="Save prompt">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>
+          </button>
           <button type="button" class="ia-btn-icon ia-copy" aria-label="Copy output" title="Copy output">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           </button>
-          <span class="ia-copied-badge" hidden>Copied</span>
+          <span class="ia-action-badge" hidden></span>
         </div>
         <button type="button" class="ia-close" aria-label="Close">&times;</button>
       </div>
       <div class="ia-body">
         <span class="ia-spinner" aria-hidden="true"></span>
-        <p class="ia-text"></p>
+        <div class="ia-content">
+          <p class="ia-text"></p>
+          <p class="ia-meta" hidden></p>
+        </div>
       </div>
     </div>
   `;
@@ -498,7 +541,52 @@ function ensureOverlay() {
         return;
       }
 
-      showCopiedFeedback(root);
+      showActionFeedback(root, "Copied");
+    });
+  }
+
+  const saveButton = root.querySelector(".ia-save");
+  if (saveButton) {
+    saveButton.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const requestId = root.dataset.requestId || "";
+      if (!requestId || root.dataset.saved === "1") {
+        return;
+      }
+
+      const textEl = root.querySelector(".ia-text");
+      const promptText = textEl?.textContent?.trim() || "";
+      if (!promptText) {
+        return;
+      }
+
+      setSaveButtonState(root, { saved: false, saving: true });
+
+      try {
+        const response = await sendRuntimeMessage({
+          type: "save-prompt",
+          payload: {
+            requestId,
+            description: promptText,
+            model: root.dataset.model || "",
+            imageUrl: root.dataset.imageUrl || "",
+            sourcePageUrl: root.dataset.sourcePageUrl || window.location.href
+          }
+        });
+
+        if (!response?.ok) {
+          throw new Error(response?.error || "Could not save prompt.");
+        }
+
+        root.dataset.saved = "1";
+        setSaveButtonState(root, { saved: true, saving: false });
+        showActionFeedback(root, "Saved");
+      } catch {
+        setSaveButtonState(root, { saved: false, saving: false });
+        showActionFeedback(root, "Save failed");
+      }
     });
   }
 
@@ -532,27 +620,43 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function showCopiedFeedback(root) {
-  const copyButton = root.querySelector(".ia-copy");
-  if (copyButton) {
-    copyButton.setAttribute("aria-label", "Copied");
-    copyButton.setAttribute("title", "Copied");
+function setSaveButtonState(root, options = {}) {
+  const saveButton = root.querySelector(".ia-save");
+  if (!saveButton) {
+    return;
   }
 
-  const copiedBadge = root.querySelector(".ia-copied-badge");
-  if (copiedBadge) {
-    copiedBadge.hidden = false;
+  const requestId = root.dataset.requestId || "";
+  const saved = Boolean(options.saved);
+  const saving = Boolean(options.saving);
+
+  saveButton.disabled = saving || saved || !requestId;
+  saveButton.classList.toggle("is-saved", saved);
+  saveButton.classList.toggle("is-saving", saving);
+  saveButton.setAttribute("aria-label", saved ? "Saved" : saving ? "Saving..." : "Save prompt");
+  saveButton.setAttribute("title", saved ? "Saved" : saving ? "Saving..." : "Save prompt");
+}
+
+function hideActionFeedback(root) {
+  const badge = root.querySelector(".ia-action-badge");
+  if (badge) {
+    badge.hidden = true;
+    badge.textContent = "";
+  }
+}
+
+function showActionFeedback(root, text) {
+  const badge = root.querySelector(".ia-action-badge");
+  if (!badge) {
+    return;
   }
 
-  clearTimeout(copyFeedbackTimer);
-  copyFeedbackTimer = setTimeout(() => {
-    if (copyButton) {
-      copyButton.setAttribute("aria-label", "Copy output");
-      copyButton.setAttribute("title", "Copy output");
-    }
-    if (copiedBadge) {
-      copiedBadge.hidden = true;
-    }
+  badge.textContent = text;
+  badge.hidden = false;
+
+  clearTimeout(actionFeedbackTimer);
+  actionFeedbackTimer = setTimeout(() => {
+    hideActionFeedback(root);
   }, 1500);
 }
 
@@ -594,6 +698,36 @@ function toUserError(error) {
     return "Extension was updated or reloaded. Refresh this tab once, then try clicking the image again.";
   }
   return message || "Image analysis failed.";
+}
+
+function formatUsageMeta(usage) {
+  if (!usage || typeof usage !== "object") {
+    return "";
+  }
+
+  const used = toNonNegativeInt(usage.used);
+  const limit = toNullableNonNegativeInt(usage.limit);
+  if (limit === null) {
+    return `${used} used this month • Unlimited plan`;
+  }
+
+  const remaining = toNullableNonNegativeInt(usage.remaining);
+  const safeRemaining = remaining === null ? Math.max(0, limit - used) : remaining;
+  return `${safeRemaining} credits left • ${used}/${limit} used`;
+}
+
+function toNonNegativeInt(value) {
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function toNullableNonNegativeInt(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(String(value), 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 function isExtensionContextInvalidatedError(message) {

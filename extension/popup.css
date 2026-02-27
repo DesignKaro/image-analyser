@@ -1,29 +1,351 @@
+:root {
+  --brand-blue: #2563eb;
+  --brand-blue-hover: #1d4ed8;
+  --brand-blue-soft: #dbeafe;
+  --brand-blue-soft-border: #bfdbfe;
+  --brand-status: #1e3a8a;
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  min-width: 340px;
+  min-width: 360px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #f8fafc;
-  color: #111827;
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
 .popup {
-  padding: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.popup-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-icon {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
 }
 
 .title {
-  margin: 0 0 6px;
-  font-size: 1.05rem;
+  margin: 0;
+  font-size: 1.04rem;
+  line-height: 1.05;
 }
 
 .subtitle {
-  margin: 0 0 14px;
+  margin: 0;
   color: #475569;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   line-height: 1.35;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card[hidden] {
+  display: none !important;
+}
+
+.field-label {
+  font-size: 0.77rem;
+  color: #334155;
+}
+
+.text-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 9px;
+  font: inherit;
+  font-size: 0.83rem;
+  color: #0f172a;
+  background: #ffffff;
+}
+
+.text-input:focus {
+  outline: 2px solid var(--brand-blue-soft-border);
+  outline-offset: 1px;
+  border-color: var(--brand-blue);
+}
+
+.auth-mode-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.mode-btn {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  padding: 7px 8px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.mode-btn.is-active {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue);
+  color: #ffffff;
+}
+
+.button-row {
+  display: flex;
+  gap: 8px;
+}
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex: 1;
+}
+
+.btn:disabled,
+.mode-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.btn-primary {
+  background: var(--brand-blue);
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: var(--brand-blue-hover);
+}
+
+.btn-secondary {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.btn-secondary:hover {
+  background: #f1f5f9;
+}
+
+.btn-saved-prompts {
+  width: 100%;
+}
+
+.btn-upgrade {
+  width: 100%;
+  background: var(--brand-blue);
+}
+
+.btn-google {
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+
+.btn-google:hover {
+  background: #f8fafc;
+}
+
+.or-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin: 2px 0;
+}
+
+.or-row::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  border-top: 1px solid #e2e8f0;
+  transform: translateY(-50%);
+}
+
+.or-row span {
+  position: relative;
+  padding: 0 8px;
+  font-size: 0.72rem;
+  color: #64748b;
+  background: #ffffff;
+}
+
+.account-email {
+  margin: 0;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.plan-text,
+.usage-text {
+  margin: 0;
+  font-size: 0.78rem;
+  color: #334155;
+  line-height: 1.4;
+}
+
+.plan-status-text {
+  margin: 0;
+  font-size: 0.73rem;
+  color: #475569;
+}
+
+.credits-alert {
+  margin: 0;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+  border-radius: 8px;
+  padding: 7px 8px;
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.usage-meter {
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+#usageMeterBar {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: inherit;
+  background: var(--brand-blue);
+  transition: width 0.2s ease;
+}
+
+.saved-prompts-panel {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 8px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saved-prompts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.saved-prompts-title {
+  margin: 0;
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.saved-prompts-refresh {
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.saved-prompts-refresh:hover {
+  background: #f8fafc;
+}
+
+.saved-prompts-empty {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #475569;
+}
+
+.saved-prompts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 168px;
+  overflow: auto;
+}
+
+.saved-prompt-item {
+  border: 1px solid #dbe4ef;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.saved-prompt-text {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: #1e293b;
+  white-space: pre-wrap;
+}
+
+.saved-prompt-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.saved-prompt-time {
+  font-size: 0.69rem;
+  color: #64748b;
+}
+
+.saved-prompt-copy {
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #f8fafc;
+  color: #1e293b;
+  font: inherit;
+  font-size: 0.69rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+
+.saved-prompt-copy:hover {
+  background: #eef2f7;
 }
 
 .toggle-row {
@@ -31,7 +353,7 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 10px;
   border: 1px solid #cbd5e1;
   border-radius: 10px;
   background: #ffffff;
@@ -39,9 +361,13 @@ body {
   user-select: none;
 }
 
+.toggle-row.is-disabled {
+  opacity: 0.68;
+}
+
 .toggle-text {
   flex: 1;
-  font-size: 0.9rem;
+  font-size: 0.84rem;
 }
 
 .toggle-input {
@@ -74,7 +400,7 @@ body {
 }
 
 .toggle-input:checked + .toggle-switch {
-  background: #0f766e;
+  background: var(--brand-blue);
 }
 
 .toggle-input:checked + .toggle-switch::before {
@@ -83,13 +409,13 @@ body {
 
 .status,
 .error {
-  margin: 10px 2px 0;
-  min-height: 18px;
-  font-size: 0.8rem;
+  margin: 2px 2px 0;
+  min-height: 16px;
+  font-size: 0.77rem;
 }
 
 .status {
-  color: #155e75;
+  color: var(--brand-status);
 }
 
 .error {

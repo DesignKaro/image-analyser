@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Image Analyser",
+  "name": "Image to Prompt",
   "version": "2.0.0",
-  "description": "Click images on any page to generate AI descriptions using your backend.",
+  "description": "Click images on any page to generate AI prompts using your backend.",
   "permissions": [
     "storage",
     "scripting",
     "activeTab",
-    "tabs"
+    "tabs",
+    "identity"
   ],
   "host_permissions": [
     "<all_urls>",
@@ -25,7 +26,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Image Analyser",
+    "default_title": "Image to Prompt",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
