@@ -23,7 +23,7 @@ import {
   UserRole,
   UserSnapshot
 } from "../lib/saas-types";
-import { getLandingContent } from "../lib/landing-content";
+import { getLandingContent, type SeoCopySection } from "../lib/landing-content";
 import {
   ArrowRightIcon,
   BrandMarkIcon,
@@ -66,12 +66,6 @@ type DemoImageSample = {
   imageUrl: string;
   thumb: string;
   fileName: string;
-};
-
-type CounterItem = {
-  value: string;
-  label: string;
-  description: string;
 };
 
 const SAMPLE_IMAGES: LlmTarget[] = [
@@ -157,132 +151,6 @@ const DEMO_SAMPLE_IMAGES: DemoImageSample[] = [
     fileName: "viewpoint-demo.jpg"
   }
 ];
-const COUNTER_ITEMS: CounterItem[] = [
-  {
-    value: "250K+",
-    label: "prompts generated",
-    description: "People use this image to prompt generator for product shots, social posts, and design refs."
-  },
-  {
-    value: "75K+",
-    label: "images analyzed",
-    description: "Screenshots, photos, and mockups turned into usable prompts."
-  },
-  {
-    value: "4+",
-    label: "AI tools supported",
-    description: "Copy your prompt into ChatGPT, Gemini, Grok, Leonardo, Midjourney, and more."
-  }
-];
-
-type ToolStepItem = {
-  title: string;
-  description: string;
-};
-
-type ToolFeatureItem = {
-  title: string;
-  description: string;
-};
-
-type ToolUseCaseItem = {
-  title: string;
-  description: string;
-};
-
-type ToolBenefitItem = {
-  title: string;
-  description: string;
-};
-
-type ToolExampleItem = {
-  title: string;
-  imageUrl: string;
-  imageAlt: string;
-  prompt: string;
-};
-
-type ToolFaqItem = {
-  question: string;
-  answer: string;
-};
-
-type SeoCopySection = {
-  heading: string;
-  paragraphs: string[];
-};
-
-const TOOL_STEPS: ToolStepItem[] = [
-  {
-    title: "Step 1: Upload your image",
-    description:
-      "Drop a JPG, PNG, or WebP—screenshot, product photo, or any image. The image to prompt generator accepts most common formats."
-  },
-  {
-    title: "Step 2: Click Generate",
-    description:
-      "We read the image and write a prompt: subject, lighting, style, composition. Usually a few seconds. You can edit the text before copying."
-  },
-  {
-    title: "Step 3: Copy and paste into your AI",
-    description:
-      "Copy the prompt and paste it into ChatGPT, Midjourney, DALL·E, Gemini, or any tool. Save prompts you like to your account for later."
-  }
-];
-
-const TOOL_FEATURES: ToolFeatureItem[] = [
-  {
-    title: "Image to prompt AI that actually reads the image",
-    description: "Describes subject, lighting, mood, and style in plain text. Edit the output before you copy."
-  },
-  {
-    title: "JPG, PNG, WebP",
-    description: "Standard formats. No weird converters—just upload and go."
-  },
-  {
-    title: "Fast results",
-    description: "Most images get a prompt in a few seconds. No long queues."
-  },
-  {
-    title: "Copy or save",
-    description: "One-click copy. Log in to save prompts you want to reuse."
-  },
-  {
-    title: "Your data stays yours",
-    description: "Images are used only to generate the prompt. Delete saved prompts anytime."
-  },
-  {
-    title: "Same account on web and extension",
-    description: "Use the site or the Chrome extension with one login and shared saved prompts."
-  }
-];
-
-const TOOL_USE_CASES: ToolUseCaseItem[] = [
-  {
-    title: "AI art and Midjourney",
-    description: "Feed a reference image into this image to prompt converter, get a text prompt, paste into Midjourney or DALL·E for variations."
-  },
-  {
-    title: "Designers",
-    description: "Screenshot a UI or moodboard, convert image to prompt online, use the text to brief ChatGPT or another AI for new concepts."
-  },
-  {
-    title: "Content and social",
-    description: "Product shots, thumbnails, or reference pics → prompt in seconds. Reuse for captions, briefs, or more AI images."
-  },
-  {
-    title: "Game and concept art",
-    description: "Environment or character art as input. Get a prompt you can tweak for Stable Diffusion, Leonardo, or similar."
-  },
-  {
-    title: "ChatGPT and multimodal AI",
-    description: "Have an image but need the words? Free image to prompt converter: upload, copy the prompt, paste into ChatGPT or Gemini."
-  },
-  {
-    title: "Marketing",
-    description: "Product photos and brand visuals → consistent prompt briefs. Same style language across campaigns."
-  }
-];
 
 const USE_CASE_ICONS = [
   SparkIcon,
@@ -293,64 +161,8 @@ const USE_CASE_ICONS = [
   BoxIcon
 ];
 
-const TOOL_BENEFITS: ToolBenefitItem[] = [
-  {
-    title: "Less time writing prompts",
-    description: "The image to prompt generator does the describing. You edit and paste where you need it."
-  },
-  {
-    title: "No prompt-engineering degree",
-    description: "If you can upload a photo, you can get a usable prompt. Tweak the text if you want more control."
-  },
-  {
-    title: "No install, no config",
-    description: "Convert image to prompt online in the browser. Upload, generate, copy. Optional Chrome extension for capture-from-tab."
-  },
-  {
-    title: "Free tier to start",
-    description: "Try the free image to prompt converter with no signup. Upgrade when you need more generations or saved prompts."
-  }
-];
-
-const TOOL_EXAMPLES: ToolExampleItem[] = [
-  {
-    title: "Product hero image to marketing prompt",
-    imageUrl: "https://picsum.photos/id/1060/1200/760",
-    imageAlt: "Minimal desk with camera and notebook",
-    prompt:
-      "Create a clean product-focused scene: a modern camera on a minimalist desk, soft natural side lighting, muted neutral palette, shallow depth of field, editorial commercial photography style, high detail, premium brand atmosphere."
-  },
-  {
-    title: "Street portrait to cinematic prompt",
-    imageUrl: "https://picsum.photos/id/1005/1200/760",
-    imageAlt: "Street portrait with natural light",
-    prompt:
-      "Generate a cinematic street portrait of a young professional walking through an urban lane, warm evening highlights, subtle film grain, realistic skin texture, candid expression, background bokeh, fashion editorial mood, 35mm lens perspective."
-  },
-  {
-    title: "Landscape to atmospheric prompt",
-    imageUrl: "https://picsum.photos/id/1018/1200/760",
-    imageAlt: "Mountain landscape at golden hour",
-    prompt:
-      "Create a wide landscape with distant mountains, golden hour light, mist in the valleys, dramatic clouds, sense of scale and depth, cinematic composition, 16:9 aspect, nature documentary mood."
-  },
-  {
-    title: "Still life to editorial prompt",
-    imageUrl: "https://picsum.photos/id/1074/1200/760",
-    imageAlt: "Still life with plants and ceramics",
-    prompt:
-      "Editorial still life: ceramic vessels and foliage on a textured surface, soft diffused window light, warm and cool tones, shallow depth of field, lifestyle magazine style, calm and curated mood."
-  },
-  {
-    title: "Architecture to design prompt",
-    imageUrl: "https://picsum.photos/id/111/1200/760",
-    imageAlt: "Modern building exterior",
-    prompt:
-      "Architectural visualization: clean lines, strong shadows, minimal human presence, blue hour lighting, sharp detail on materials, symmetrical composition, contemporary design emphasis."
-  }
-];
-
-const TOOL_FAQS: ToolFaqItem[] = [
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for potential future use
+const TOOL_FAQS = [
   {
     question: "Is this image to prompt converter free?",
     answer:
@@ -443,6 +255,7 @@ const TOOL_FAQS: ToolFaqItem[] = [
   }
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept for potential future use
 const SEO_COPY: SeoCopySection[] = [
   {
     heading: "What is an image to prompt converter?",
@@ -2433,7 +2246,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
             onClick={() =>
               setUseCaseSlide((s) => Math.min(Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1, s + 1))
             }
-            disabled={useCaseSlide >= Math.ceil(TOOL_USE_CASES.length / useCaseCardsPerSlide) - 1}
+            disabled={useCaseSlide >= Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1}
             aria-label="Next use cases"
           >
             <ChevronRightIcon aria-hidden />
