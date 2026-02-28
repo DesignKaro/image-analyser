@@ -16,3 +16,6 @@ node_modules/
 dist/
 .cache/
 .next/
+
+# Extension package (optional – remove to commit release zips)
+extension/*.zip

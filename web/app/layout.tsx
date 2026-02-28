@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { LocaleProvider } from "./ui/LocaleProvider";
+import { StickyShare } from "./ui/StickyShare";
 import "./globals.css";
 
 const geoFont = localFont({
@@ -32,11 +33,26 @@ const geoFont = localFont({
 
 export const metadata: Metadata = {
   metadataBase: resolveMetadataBase(),
-  title: "Image Analyser | Web",
-  description: "Upload an image and generate a GPT description using the same backend as the extension.",
+  title: {
+    default: "Image to Prompt – Free Image to Prompt Generator Online",
+    template: "%s | Image to Prompt"
+  },
+  description:
+    "Free image to prompt generator: upload an image and get AI-ready prompts for ChatGPT, Midjourney, Gemini, and more. Convert image to prompt online in seconds.",
+  keywords: ["image to prompt", "image to prompt generator", "image to prompt ai", "convert image to prompt online", "free image to prompt converter"],
   icons: {
     icon: "/icon.svg",
     shortcut: "/icon.svg"
+  },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    images: [{ url: "/home-hero-icons.png", width: 1200, height: 630, alt: "Image to Prompt – turn images into AI prompts" }]
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Image to Prompt – Free Image to Prompt Generator Online",
+    description: "Upload an image and get AI-ready prompts for ChatGPT, Midjourney, Gemini, and more."
   }
 };
 
@@ -57,7 +73,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={geoFont.variable}>
-        <LocaleProvider>{children}</LocaleProvider>
+        <LocaleProvider>
+          {children}
+          <StickyShare />
+        </LocaleProvider>
       </body>
     </html>
   );

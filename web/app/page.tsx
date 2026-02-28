@@ -2,23 +2,23 @@ import type { Metadata } from "next";
 import { ImageAnalyserLanding } from "./ui/image-analyser-landing";
 
 export const metadata: Metadata = {
-  title: "Free Image to Prompt Converter Online (AI Tool)",
+  title: "Image to Prompt – Free Generator & Converter",
   description:
-    "Convert image to prompt online in seconds. Upload JPG, PNG, or WebP, generate AI-ready prompts, and use them in ChatGPT, Midjourney, and more. Try it free.",
+    "Turn any image into an AI-ready prompt. Upload a photo, get a text prompt for ChatGPT, Midjourney, Gemini, and more. Free to try, no signup.",
   keywords: [
+    "image to prompt",
     "image to prompt converter",
     "convert image to prompt online",
-    "image to prompt online",
-    "ai prompt generator from image",
+    "image to prompt generator",
     "free image prompt tool"
   ],
   alternates: {
     canonical: "/image-to-prompt-converter"
   },
   openGraph: {
-    title: "Free Image to Prompt Converter Online (AI Tool)",
+    title: "Image to Prompt – Free Generator & Converter",
     description:
-      "Upload an image and generate structured prompts instantly for ChatGPT, Midjourney, and other AI tools.",
+      "Upload an image and get a text prompt for any AI. ChatGPT, Midjourney, Gemini, and more.",
     url: "/image-to-prompt-converter",
     type: "website"
   }

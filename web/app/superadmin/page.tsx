@@ -1019,6 +1019,12 @@ export default function SuperadminPage() {
           <div className="footer-simple-top">
             <nav className="footer-simple-links" aria-label="Product and tool pages">
               <Link href="/">Image to Prompt</Link>
+              <Link href="/image-to-prompt-converter">Image to Prompt Converter</Link>
+              <Link href="/image-prompt-generator">Image Prompt Generator</Link>
+              <Link href="/gemini-ai-photo-prompt">Gemini AI Photo Prompt</Link>
+              <Link href="/ai-gemini-photo-prompt">AI Gemini Photo Prompt</Link>
+              <Link href="/google-gemini-ai-photo-prompt">Google Gemini AI Photo Prompt</Link>
+              <Link href="/gemini-prompt">Gemini Prompt</Link>
               <Link href="/bulk">Bulk Image to Prompt</Link>
               <Link href="/pricing">Pricing</Link>
               <Link href="/chrome-extension">Chrome Extension</Link>

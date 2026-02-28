@@ -1,34 +1,68 @@
 import type { MetadataRoute } from "next";
 
+const SITE_URL = resolveSiteUrl();
+
 export default function sitemap(): MetadataRoute.Sitemap {
-  const siteUrl = resolveSiteUrl();
   const now = new Date();
-  const routes = [
+
+  const productPages = [
     "/",
     "/image-to-prompt-converter",
+    "/image-prompt-generator",
+    "/gemini-ai-photo-prompt",
+    "/ai-gemini-photo-prompt",
+    "/google-gemini-ai-photo-prompt",
+    "/gemini-prompt"
+  ];
+
+  const toolPages = [
+    "/bulk",
     "/chrome-extension",
     "/pricing",
-    "/bulk",
+    "/result"
+  ];
+
+  const accountPages = [
     "/profile",
     "/billing",
-    "/saved-prompts",
+    "/saved-prompts"
+  ];
+
+  const infoPages = [
     "/about",
+    "/contact",
+    "/faqs"
+  ];
+
+  const legalPages = [
     "/privacy",
     "/terms",
     "/cookies",
     "/accessibility",
-    "/security",
+    "/security"
+  ];
+
+  const toolsSubPages = [
     "/tools/ai-image-generator",
     "/tools/prompt-enhancer",
     "/tools/background-remover",
     "/tools/image-upscaler"
   ];
 
-  return routes.map((route) => ({
-    url: `${siteUrl}${route}`,
+  const routes: { path: string; priority: number; changeFrequency: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never" }[] = [
+    ...productPages.map((path) => ({ path, priority: path === "/" ? 1 : 0.9, changeFrequency: "weekly" as const })),
+    ...toolPages.map((path) => ({ path, priority: 0.85, changeFrequency: "weekly" as const })),
+    ...accountPages.map((path) => ({ path, priority: 0.6, changeFrequency: "monthly" as const })),
+    ...infoPages.map((path) => ({ path, priority: 0.75, changeFrequency: "monthly" as const })),
+    ...legalPages.map((path) => ({ path, priority: 0.5, changeFrequency: "yearly" as const })),
+    ...toolsSubPages.map((path) => ({ path, priority: 0.7, changeFrequency: "monthly" as const }))
+  ];
+
+  return routes.map(({ path, priority, changeFrequency }) => ({
+    url: `${SITE_URL}${path}`,
     lastModified: now,
-    changeFrequency: route === "/" ? "daily" : "weekly",
-    priority: route === "/" ? 1 : 0.7
+    changeFrequency: path === "/" ? ("daily" as const) : changeFrequency,
+    priority
   }));
 }
 

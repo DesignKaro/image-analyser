@@ -1,7 +1,7 @@
 "use client";
 
 import NextImage from "next/image";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ChangeEvent, CSSProperties, DragEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AUTH_TOKEN_STORAGE_KEY, SHRINK_DISTANCE, resolveBackendUrl } from "../lib/client-config";
 import {
@@ -23,6 +23,7 @@ import {
   UserRole,
   UserSnapshot
 } from "../lib/saas-types";
+import { getLandingContent } from "../lib/landing-content";
 import {
   ArrowRightIcon,
   BrandMarkIcon,
@@ -40,6 +41,7 @@ import {
   PuzzleIcon,
   SaveIcon,
   ServerIcon,
+  ShareIcon,
   ShieldIcon,
   SparkIcon,
   SearchIcon,
@@ -100,6 +102,35 @@ const SAMPLE_IMAGES: LlmTarget[] = [
 const MODAL_LLM_IMAGES = SAMPLE_IMAGES.filter(
   (item) => item.label === "ChatGPT" || item.label === "Grok"
 );
+
+const SHARE_X_SVG = (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+  </svg>
+);
+const SHARE_LINKEDIN_SVG = (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
+  </svg>
+);
+const SHARE_FACEBOOK_SVG = (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+  </svg>
+);
+const SHARE_WHATSAPP_SVG = (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+  </svg>
+);
+
+const RESULT_TRANSLATE_LANGUAGES: { code: string; label: string }[] = [
+  { code: "hi", label: "Hindi" },
+  { code: "es", label: "Spanish" },
+  { code: "fr", label: "French" },
+  { code: "de", label: "German" },
+  { code: "ja", label: "Japanese" }
+];
 const DEMO_SAMPLE_IMAGES: DemoImageSample[] = [
   {
     label: "Person demo",
@@ -130,17 +161,17 @@ const COUNTER_ITEMS: CounterItem[] = [
   {
     value: "250K+",
     label: "prompts generated",
-    description: "Image to prompt outputs created by teams, creators, and marketers."
+    description: "People use this image to prompt generator for product shots, social posts, and design refs."
   },
   {
     value: "75K+",
     label: "images analyzed",
-    description: "Product shots, social creatives, screenshots, and design references processed."
+    description: "Screenshots, photos, and mockups turned into usable prompts."
   },
   {
     value: "4+",
-    label: "LLMs supported",
-    description: "Works with ChatGPT, Gemini, Grok, Leonardo, and more."
+    label: "AI tools supported",
+    description: "Copy your prompt into ChatGPT, Gemini, Grok, Leonardo, Midjourney, and more."
   }
 ];
 
@@ -185,71 +216,71 @@ const TOOL_STEPS: ToolStepItem[] = [
   {
     title: "Step 1: Upload your image",
     description:
-      "Drop a JPG, PNG, or WebP screenshot, product photo, or any visual reference into the uploader."
+      "Drop a JPG, PNG, or WebP—screenshot, product photo, or any image. The image to prompt generator accepts most common formats."
   },
   {
-    title: "Step 2: Click Generate Prompt",
+    title: "Step 2: Click Generate",
     description:
-      "Our AI analyzes composition, subject, lighting, and style to create a structured prompt in seconds."
+      "We read the image and write a prompt: subject, lighting, style, composition. Usually a few seconds. You can edit the text before copying."
   },
   {
-    title: "Step 3: Copy and use in your AI tool",
+    title: "Step 3: Copy and paste into your AI",
     description:
-      "Copy the prompt, save it to your account, or paste it straight into ChatGPT, Midjourney, or any other AI model."
+      "Copy the prompt and paste it into ChatGPT, Midjourney, DALL·E, Gemini, or any tool. Save prompts you like to your account for later."
   }
 ];
 
 const TOOL_FEATURES: ToolFeatureItem[] = [
   {
-    title: "AI-powered prompt generation",
-    description: "Transforms visual detail into structured text prompts designed for modern AI workflows."
+    title: "Image to prompt AI that actually reads the image",
+    description: "Describes subject, lighting, mood, and style in plain text. Edit the output before you copy."
   },
   {
-    title: "Supports JPG, PNG, and WebP",
-    description: "Upload common image formats used by creators, marketers, and design teams."
+    title: "JPG, PNG, WebP",
+    description: "Standard formats. No weird converters—just upload and go."
   },
   {
-    title: "High-accuracy visual detection",
-    description: "Captures subject, setting, color cues, mood, and style signals with clear language."
+    title: "Fast results",
+    description: "Most images get a prompt in a few seconds. No long queues."
   },
   {
-    title: "Instant processing",
-    description: "Built for speed so users can move from image to usable prompt in one short cycle."
+    title: "Copy or save",
+    description: "One-click copy. Log in to save prompts you want to reuse."
   },
   {
-    title: "Privacy-safe account controls",
-    description: "Signed-in sessions, plan-aware credits, and controlled saved prompts for accountable usage."
+    title: "Your data stays yours",
+    description: "Images are used only to generate the prompt. Delete saved prompts anytime."
   },
   {
-    title: "Web and extension sync",
-    description: "Use the same login, subscription, and saved prompts across website and browser extension."
+    title: "Same account on web and extension",
+    description: "Use the site or the Chrome extension with one login and shared saved prompts."
   }
 ];
 
 const TOOL_USE_CASES: ToolUseCaseItem[] = [
   {
-    title: "AI Artists",
-    description: "Convert reference images into stylized generation prompts with better descriptive depth."
+    title: "AI art and Midjourney",
+    description: "Feed a reference image into this image to prompt converter, get a text prompt, paste into Midjourney or DALL·E for variations."
   },
   {
     title: "Designers",
-    description: "Turn UI shots and moodboards into prompt-ready direction for rapid concept exploration."
+    description: "Screenshot a UI or moodboard, convert image to prompt online, use the text to brief ChatGPT or another AI for new concepts."
   },
   {
-    title: "Content Creators",
-    description: "Generate reusable prompts for thumbnails, campaign visuals, and storytelling assets."
+    title: "Content and social",
+    description: "Product shots, thumbnails, or reference pics → prompt in seconds. Reuse for captions, briefs, or more AI images."
   },
   {
-    title: "Game Developers",
-    description: "Build prompts from environment references and character art for ideation pipelines."
+    title: "Game and concept art",
+    description: "Environment or character art as input. Get a prompt you can tweak for Stable Diffusion, Leonardo, or similar."
   },
   {
-    title: "Midjourney and ChatGPT users",
-    description: "Use ready prompts faster without manual prompt drafting for each new image."
+    title: "ChatGPT and multimodal AI",
+    description: "Have an image but need the words? Free image to prompt converter: upload, copy the prompt, paste into ChatGPT or Gemini."
   },
   {
-    title: "Marketing Teams",
-    description: "Turn product photos and brand assets into consistent, on-brand prompt briefs for campaigns."
+    title: "Marketing",
+    description: "Product photos and brand visuals → consistent prompt briefs. Same style language across campaigns."
   }
 ];
 
@@ -264,20 +295,20 @@ const USE_CASE_ICONS = [
 
 const TOOL_BENEFITS: ToolBenefitItem[] = [
   {
-    title: "Save hours of manual prompt writing",
-    description: "Start from structured output instead of writing every prompt block from scratch."
+    title: "Less time writing prompts",
+    description: "The image to prompt generator does the describing. You edit and paste where you need it."
   },
   {
-    title: "Beginner-friendly by design",
-    description: "No prompt engineering background required to produce useful AI-ready instructions."
+    title: "No prompt-engineering degree",
+    description: "If you can upload a photo, you can get a usable prompt. Tweak the text if you want more control."
   },
   {
-    title: "No technical setup required",
-    description: "Upload, click generate, and copy in one interface with minimal friction."
+    title: "No install, no config",
+    description: "Convert image to prompt online in the browser. Upload, generate, copy. Optional Chrome extension for capture-from-tab."
   },
   {
-    title: "Free online entry plan",
-    description: "New users can start immediately and upgrade only when their workflow scales."
+    title: "Free tier to start",
+    description: "Try the free image to prompt converter with no signup. Upgrade when you need more generations or saved prompts."
   }
 ];
 
@@ -323,47 +354,52 @@ const TOOL_FAQS: ToolFaqItem[] = [
   {
     question: "Is this image to prompt converter free?",
     answer:
-      "Yes. A free plan is available so you can test the workflow and generate prompts without setup complexity. Paid plans offer more generations and saved prompts for heavier use."
+      "Yes. You can use the free image to prompt converter without signing up. Paid plans give you more generations and saved prompts."
   },
   {
-    question: "Which AI models work with the generated prompts?",
+    question: "How do I use the generated prompt in Midjourney or DALL·E?",
     answer:
-      "You can use the output in ChatGPT, Midjourney, DALL·E, Gemini, Stable Diffusion, Leonardo, Runway, and other text-to-image or multimodal tools. Prompts are written in plain language so you can paste and tweak as needed."
+      "Copy the prompt from our tool and paste it into Midjourney's /imagine box, DALL·E's prompt field, or any text-to-image AI. You're generating a text description from your image—that text is what you paste. Add style words (e.g. 'oil painting', 'cinematic') if you want. The prompt is yours to edit before you use it."
+  },
+  {
+    question: "Which AI tools work with the generated prompts?",
+    answer:
+      "Any tool that takes a text prompt: ChatGPT, Midjourney, DALL·E, Gemini, Stable Diffusion, Leonardo, Runway. Plain language, so you can paste and tweak."
   },
   {
     question: "Is my image stored permanently?",
     answer:
-      "Images are processed for generation only. Saved prompts are stored under your account and you can delete them anytime. Check our privacy policy for full details on retention and data handling."
+      "Images are used only to generate the prompt. We don't keep them. Saved prompts are stored in your account; you can delete them anytime."
   },
   {
     question: "Can I use generated prompts commercially?",
     answer:
-      "Yes, in most cases. The prompts you generate are yours to use. Always review the terms of the AI platform you paste them into (e.g. Midjourney, OpenAI) for any commercial or licensing rules."
+      "The prompts you generate are yours. Check the terms of whatever you paste them into (Midjourney, OpenAI, etc.) for commercial use."
   },
   {
     question: "What image formats and sizes are supported?",
     answer:
-      "Common formats like JPEG, PNG, and WebP are supported. Very large files may be resized for processing. For best results, use clear, well-lit images rather than heavily compressed or tiny thumbnails."
+      "JPG, PNG, WebP. Big files may be resized. Clear, well-lit images give better prompts than tiny or heavily compressed ones."
   },
   {
     question: "How accurate is the generated prompt?",
     answer:
-      "Quality depends on the source image. Clear subjects, good lighting, and recognizable composition usually produce strong prompts. You can edit the text before copying or saving to add style, mood, or technical terms."
+      "Depends on the image. Clear subject and good lighting usually get a solid prompt. You can edit the text before copying."
   },
   {
     question: "Do I need an account to try it?",
     answer:
-      "You can generate prompts without signing in on the free plan. An account is required to save prompts, access higher limits, and use features like the Chrome extension with saved history."
+      "No. Free plan works without sign-in. Sign in to save prompts, get higher limits, and use the Chrome extension with history."
   },
   {
     question: "Can I use this on mobile?",
     answer:
-      "Yes. The web app works in mobile browsers. Upload from your camera or gallery, generate the prompt, then copy or save. For desktop workflows, the Chrome extension lets you capture images from any tab."
+      "Yes. Use the site in your mobile browser—upload from camera or gallery, generate, copy. Chrome extension is for desktop (capture from any tab)."
   },
   {
     question: "What’s the difference between monthly and annual pricing?",
     answer:
-      "Annual billing is discounted (e.g. save 20%) compared to paying monthly. You get the same features; switching to annual reduces cost if you use the tool regularly. You can change or cancel from your profile."
+      "Annual is cheaper (e.g. save 20%). Same features. Change or cancel from your profile."
   },
   {
     question: "Why did my prompt come out generic or vague?",
@@ -411,50 +447,50 @@ const SEO_COPY: SeoCopySection[] = [
   {
     heading: "What is an image to prompt converter?",
     paragraphs: [
-      "An image to prompt converter is a practical AI tool that reads visual information and translates it into usable text prompts. Instead of manually describing a scene line by line, users upload a photo and receive a structured prompt that can be pasted into models like ChatGPT, Midjourney, and other creative AI systems.",
-      "This matters because prompt quality controls output quality. When your prompt misses composition, lighting, or style detail, generated results become generic. A strong converter helps close that gap by turning visual context into concise instruction blocks so the first output is already close to your intended direction."
+      "An image to prompt converter is a tool that turns a picture into text. You upload an image; it gives you a written description you can paste into ChatGPT, Midjourney, DALL·E, or any AI that takes a text prompt. No more staring at a photo trying to phrase every detail—the image to prompt AI does the describing.",
+      "Why it helps: the better your prompt, the better the result. Vague prompts get generic outputs. A good free image to prompt converter turns what you see (subject, lighting, style, mood) into clear sentences so your first try is already usable."
     ]
   },
   {
-    heading: "Why prompts matter for modern AI workflows",
+    heading: "Why use an image to prompt generator?",
     paragraphs: [
-      "Teams now rely on AI for creative drafts, campaign production, UI concepting, and rapid iteration. In each workflow, prompt quality is a lever: better prompts reduce revision cycles, lower content waste, and increase consistency between team members. This is true whether you are producing marketing assets, ideating interfaces, or generating concept art.",
-      "The challenge is that manual prompt writing takes time and requires repeated experimentation. People often know what they want visually but struggle to translate that intent into model-friendly language. Converting image to prompt online solves this by grounding text instructions in actual visual references."
+      "Lots of people have a reference image in their head or on their screen but find it hard to write the prompt. You know the look you want; putting it into words is the bottleneck. An image to prompt generator reads the image and writes the words for you.",
+      "Same idea for teams: one person’s “warm, minimal product shot” is another’s “soft light, white background.” Convert image to prompt online once, and everyone works from the same description. Fewer revisions, more consistent briefs."
     ]
   },
   {
-    heading: "How to convert image to prompt online effectively",
+    heading: "How to convert image to prompt online",
     paragraphs: [
-      "The best process is straightforward. Start with a clear source image that reflects your target style. Upload it, generate the prompt, then make light edits to adjust tone, lens language, or output format. This approach is faster than writing from a blank document because the converter already handles scene description and styling cues.",
-      "For production usage, store prompts you plan to reuse, tag outputs by campaign or asset type, and keep a small library of high-performing prompts. Over time, this creates a reliable internal prompt system that scales across teammates and projects."
+      "Pick a clear image—product shot, screenshot, moodboard, or reference. Upload it here, click generate, then copy the text. You can edit the prompt before pasting it into Midjourney, ChatGPT, or wherever. That’s the core flow.",
+      "For repeat work, save the prompts you like. Build a small library so you’re not regenerating the same kind of brief every time. Many users do one pass with the image to prompt converter, then tweak a few words for brand or style."
     ]
   },
   {
-    heading: "Prompt engineering basics without complexity",
+    heading: "What makes a good prompt (and how the tool helps)",
     paragraphs: [
-      "You do not need deep technical prompt engineering to get strong outputs. In practice, high-performing prompts usually include five parts: primary subject, scene context, visual style, lighting and quality terms, and intent constraints. An image to prompt converter automatically drafts these blocks so beginners can work like advanced users.",
-      "Once generated, users can tune specificity. If results feel broad, add constraints. If results feel too narrow, remove strict terms. This edit loop is short and predictable when your first draft is structured correctly."
+      "Strong prompts usually cover: what’s in the scene, the style (e.g. cinematic, flat lay), lighting, and mood. You don’t need to be a prompt engineer—an image to prompt converter drafts that structure from your image. You can then add or remove detail (e.g. “oil painting,” “wide angle”) to get the output you want.",
+      "If the first result feels too generic, try a clearer or simpler source image, or add a line after the generated text. The tool gives you a solid first draft; you keep control of the final wording."
     ]
   },
   {
-    heading: "Image to prompt converter vs manual prompting",
+    heading: "Image to prompt converter vs writing prompts yourself",
     paragraphs: [
-      "Manual prompting is useful for highly custom logic, but it is slow for everyday execution. Most teams are not blocked by ideas; they are blocked by throughput. A converter removes repetitive drafting and creates consistent language patterns that reduce decision fatigue.",
-      "For many users, the right model is hybrid: generate the first prompt from an image, then apply manual refinement for brand voice, campaign constraints, or audience context. This keeps quality high without sacrificing speed."
+      "Writing prompts from scratch is flexible but slow. Describing every image by hand doesn’t scale when you’re doing lots of assets or iterations. A converter gives you a starting prompt in seconds, so you spend time editing instead of typing from zero.",
+      "A common pattern: use the free image to prompt converter to get the base description, then adjust for your brand, campaign, or audience. You get speed and consistency without giving up control."
     ]
   },
   {
-    heading: "Privacy, trust, and performance signals",
+    heading: "Privacy and speed",
     paragraphs: [
-      "Trust influences both user retention and SEO outcomes. This tool emphasizes session-based authentication, explicit account controls, and user-managed saved prompts. Clear privacy notes reduce uncertainty, and predictable performance keeps workflows moving without friction.",
-      "Fast loading and low interaction latency are equally important. Prompt tools are used in active creative sessions, so each second of delay interrupts thinking. Maintaining fast page delivery, secure transport, and stable generation flow improves both user satisfaction and search performance over time."
+      "We use your image only to generate the prompt. We don’t keep the image. Saved prompts live in your account; you can delete them anytime. We use HTTPS, normal auth, and try to keep the page and generation fast so you’re not waiting mid-session.",
+      "If you care about data handling, check our privacy policy. The short version: images aren’t stored for the long term; you own your prompts."
     ]
   },
   {
-    heading: "Who should use this tool",
+    heading: "Who’s it for?",
     paragraphs: [
-      "This workflow is useful for AI artists, designers, marketers, ecommerce teams, product managers, and founders testing visual concepts quickly. If your process starts from references, screenshots, or inspiration boards, converting image to prompt online helps you move from idea to output faster.",
-      "It also works well for teams that need repeatability. Shared prompt history, plan-aware usage, and the extension make it easy to run the same process across web browsing and production tasks while keeping output quality consistent."
+      "Anyone who needs to go from image to text prompt: AI artists, designers, content creators, marketers, game or concept artists. If you often have a reference image and need a prompt for Midjourney, ChatGPT, or another tool, convert image to prompt online here and paste the result.",
+      "It’s also useful when several people need to share the same “brief” for a visual. One image, one generated prompt, same language for the whole team."
     ]
   }
 ];
@@ -464,53 +500,125 @@ const SITE_BASE_URL = (process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://imag
   ""
 );
 
-const SOFTWARE_APPLICATION_SCHEMA = {
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  name: "Image to Prompt Converter",
-  applicationCategory: "MultimediaApplication",
-  operatingSystem: "Web",
-  description:
-    "Free image to prompt converter online. Upload an image, generate a structured AI prompt, and use it in ChatGPT, Midjourney, and more.",
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD"
-  },
-  url: `${SITE_BASE_URL}/image-to-prompt-converter`
-};
+/** Build schema from content so each variant has correct JSON-LD (avoids GSC duplicate/conflict). */
+function buildSoftwareApplicationSchema(
+  baseUrl: string,
+  name: string,
+  description: string,
+  path: string,
+  imageUrl?: string
+) {
+  const image =
+    imageUrl &&
+    (imageUrl.startsWith("http") ? imageUrl : `${baseUrl}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`);
+  return {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name,
+    applicationCategory: "MultimediaApplication",
+    operatingSystem: "Web",
+    description,
+    ...(image && { image: image }),
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    url: `${baseUrl}/${path}`
+  };
+}
 
-const FAQ_SCHEMA = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  mainEntity: TOOL_FAQS.map((item) => ({
-    "@type": "Question",
-    name: item.question,
-    acceptedAnswer: {
-      "@type": "Answer",
-      text: item.answer
-    }
-  }))
-};
+function buildBreadcrumbSchema(baseUrl: string, pageName: string, pagePath: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: pageName, item: `${baseUrl}/${pagePath}` }
+    ]
+  };
+}
 
-const BREADCRUMB_SCHEMA = {
-  "@context": "https://schema.org",
-  "@type": "BreadcrumbList",
-  itemListElement: [
-    {
-      "@type": "ListItem",
-      position: 1,
-      name: "Home",
-      item: `${SITE_BASE_URL}/`
+function buildOrganizationSchema(baseUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Image to Prompt",
+    url: `${baseUrl}/`,
+    logo: `${baseUrl}/icon.svg`,
+    description: "Free image to prompt generator and converter. Turn images into AI-ready prompts for ChatGPT, Midjourney, Gemini, and more."
+  };
+}
+
+function buildWebSiteSchema(baseUrl: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Image to Prompt",
+    url: `${baseUrl}/`,
+    description: "Free image to prompt generator: upload an image and get AI-ready prompts for ChatGPT, Midjourney, Gemini, and more.",
+    publisher: {
+      "@type": "Organization",
+      name: "Image to Prompt",
+      url: `${baseUrl}/`,
+      logo: `${baseUrl}/icon.svg`
     },
-    {
-      "@type": "ListItem",
-      position: 2,
-      name: "Image to Prompt Converter",
-      item: `${SITE_BASE_URL}/image-to-prompt-converter`
+    inLanguage: "en"
+  };
+}
+
+function buildHowToSchema(
+  baseUrl: string,
+  pagePath: string,
+  name: string,
+  steps: Array<{ title: string; description: string }>
+) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "HowTo",
+    name,
+    url: `${baseUrl}/${pagePath}`,
+    step: steps.map((s, i) => ({
+      "@type": "HowToStep",
+      position: i + 1,
+      name: s.title.replace(/^Step \d+:\s*/i, "").trim() || s.title,
+      text: s.description
+    }))
+  };
+}
+
+function buildArticleSchema(
+  baseUrl: string,
+  pagePath: string,
+  headline: string,
+  description: string,
+  sections: Array<{ heading: string; paragraphs: string[] }>
+) {
+  const articleBody = sections
+    .map((s) => `${s.heading}\n\n${s.paragraphs.join("\n\n")}`)
+    .join("\n\n");
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline,
+    description,
+    articleBody,
+    datePublished: "2024-01-01",
+    dateModified: "2025-01-01",
+    url: `${baseUrl}/${pagePath}#seo-content`,
+    author: {
+      "@type": "Organization",
+      name: "Image to Prompt",
+      url: `${baseUrl}/`
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Image to Prompt",
+      url: `${baseUrl}/`,
+      logo: `${baseUrl}/icon.svg`
+    },
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": `${baseUrl}/${pagePath}#seo-content`
     }
-  ]
-};
+  };
+}
 
 const COUNTER_DURATION_MS = 1400;
 const COUNTER_EASE = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -669,7 +777,71 @@ async function ensureGoogleIdentityLoaded() {
   return scopedWindow.google.accounts.id;
 }
 
-export function ImageAnalyserLanding() {
+type ImageAnalyserLandingProps = { variant?: string };
+
+export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnalyserLandingProps) {
+  const content = useMemo(() => getLandingContent(variant ?? "image-to-prompt"), [variant]);
+  const faqSchema = useMemo(
+    () => ({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      mainEntity: content.faqs.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: { "@type": "Answer", text: item.answer }
+      }))
+    }),
+    [content.faqs]
+  );
+  const softwareApplicationSchema = useMemo(
+    () =>
+      buildSoftwareApplicationSchema(
+        SITE_BASE_URL,
+        content.schemaAppName,
+        content.schemaAppDescription,
+        content.schemaPagePath,
+        content.heroImageUrl
+      ),
+    [
+      content.schemaAppName,
+      content.schemaAppDescription,
+      content.schemaPagePath,
+      content.heroImageUrl
+    ]
+  );
+  const breadcrumbSchema = useMemo(
+    () =>
+      buildBreadcrumbSchema(SITE_BASE_URL, content.schemaPageName, content.schemaPagePath),
+    [content.schemaPageName, content.schemaPagePath]
+  );
+  const organizationSchema = useMemo(() => buildOrganizationSchema(SITE_BASE_URL), []);
+  const webSiteSchema = useMemo(() => buildWebSiteSchema(SITE_BASE_URL), []);
+  const howToSchema = useMemo(
+    () =>
+      buildHowToSchema(
+        SITE_BASE_URL,
+        content.schemaPagePath,
+        content.howToUseH2,
+        content.steps
+      ),
+    [content.schemaPagePath, content.howToUseH2, content.steps]
+  );
+  const articleSchema = useMemo(
+    () =>
+      buildArticleSchema(
+        SITE_BASE_URL,
+        content.schemaPagePath,
+        content.seoGuideTitle,
+        content.seoGuideIntro,
+        content.seoCopy
+      ),
+    [
+      content.schemaPagePath,
+      content.seoGuideTitle,
+      content.seoGuideIntro,
+      content.seoCopy
+    ]
+  );
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const [imageDataUrl, setImageDataUrl] = useState<string>("");
@@ -682,6 +854,11 @@ export function ImageAnalyserLanding() {
   const [resultSaved, setResultSaved] = useState<boolean>(false);
   const [resultSaveBusy, setResultSaveBusy] = useState<boolean>(false);
   const [resultSaveError, setResultSaveError] = useState<string>("");
+  const [resultTranslateBusy, setResultTranslateBusy] = useState<boolean>(false);
+  const [resultTranslateLang, setResultTranslateLang] = useState<string | null>(null);
+  const [resultTranslateError, setResultTranslateError] = useState<string>("");
+  const [shareMenuOpen, setShareMenuOpen] = useState<boolean>(false);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
   const [dragActive, setDragActive] = useState<boolean>(false);
@@ -715,11 +892,26 @@ export function ImageAnalyserLanding() {
   const [profileRefreshLoading, setProfileRefreshLoading] = useState<boolean>(false);
   const [billingAnnual, setBillingAnnual] = useState<boolean>(false);
   const [useCaseSlide, setUseCaseSlide] = useState<number>(0);
+  const [useCaseCardsPerSlide, setUseCaseCardsPerSlide] = useState<number>(2);
   const [showBackToTop, setShowBackToTop] = useState<boolean>(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => setUseCaseCardsPerSlide(mq.matches ? 1 : 2);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const maxSlide = Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1;
+    setUseCaseSlide((s) => Math.min(s, Math.max(0, maxSlide)));
+  }, [useCaseCardsPerSlide, content.useCases.length]);
   const [pricingContext, setPricingContext] = useState<PricingContextSnapshot | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
   const router = useRouter();
+  const pathname = usePathname();
 
   const backendUrl = useMemo(() => resolveBackendUrl(), []);
 
@@ -823,6 +1015,17 @@ export function ImageAnalyserLanding() {
     void loadPricingContext();
     return () => controller.abort();
   }, [backendUrl]);
+
+  useEffect(() => {
+    if (!shareMenuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(e.target as Node)) {
+        setShareMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [shareMenuOpen]);
 
   async function onSubmitAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -1350,6 +1553,9 @@ export function ImageAnalyserLanding() {
     setResultSaved(false);
     setResultSaveBusy(false);
     setResultSaveError("");
+    setResultTranslateBusy(false);
+    setResultTranslateLang(null);
+    setResultTranslateError("");
     setError("");
     setLoading(false);
     setResultModalOpen(false);
@@ -1560,6 +1766,72 @@ export function ImageAnalyserLanding() {
     }
   }
 
+  async function onTranslatePrompt(targetLangCode: string) {
+    if (!description || resultTranslateBusy || !authToken) {
+      if (!authToken) {
+        setResultTranslateError("Sign in to translate prompts.");
+        openAuthModal("signin");
+      }
+      return;
+    }
+
+    const imagePayload =
+      typeof imageDataUrl === "string" && imageDataUrl.startsWith("data:image/")
+        ? { imageDataUrl, imageUrl: undefined }
+        : { imageDataUrl: undefined, imageUrl: resultImageUrl || imageUrl || "" };
+
+    if (!imagePayload.imageDataUrl && !imagePayload.imageUrl) {
+      setResultTranslateError("Image data is missing. Generate again and try.");
+      return;
+    }
+
+    setResultTranslateBusy(true);
+    setResultTranslateLang(targetLangCode);
+    setResultTranslateError("");
+
+    try {
+      const response = await fetch(`${backendUrl}/api/translate-prompt`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          ...imagePayload,
+          description,
+          targetLanguage: targetLangCode,
+          model: resultModel
+        })
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as ApiResponse;
+      if (!response.ok || !payload.ok) {
+        if (response.status === 401) {
+          clearAuthState();
+          openAuthModal("signin");
+        } else if (response.status === 402) {
+          setOutOfCreditsModalOpen(true);
+          setResultTranslateError("Credits exhausted. Upgrade plan to continue.");
+        } else {
+          setResultTranslateError(payload.error || "Translation failed.");
+        }
+        return;
+      }
+
+      const text = typeof payload.description === "string" ? payload.description.trim() : "";
+      if (text) {
+        setDescription(text);
+        setCopied(false);
+        applySessionPayload(payload);
+      }
+    } catch (err) {
+      setResultTranslateError(err instanceof Error ? err.message : "Translation failed.");
+    } finally {
+      setResultTranslateBusy(false);
+      setResultTranslateLang(null);
+    }
+  }
+
   function onOpenLlm(sample: LlmTarget) {
     if (!description) {
       return;
@@ -1639,14 +1911,33 @@ export function ImageAnalyserLanding() {
 
   return (
     <div className="site-shell" data-nav-scrolled={headerScrollProgress > 0.08 ? "" : undefined}>
+      <a href="#home" className="skip-to-main">
+        Skip to main content
+      </a>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_APPLICATION_SCHEMA) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareApplicationSchema) }}
       />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(FAQ_SCHEMA) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }} />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(BREADCRUMB_SCHEMA) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(howToSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleSchema) }}
       />
 
       <header
@@ -1695,7 +1986,11 @@ export function ImageAnalyserLanding() {
                         role="menuitem"
                         onClick={() => {
                           setProfileMenuOpen(false);
-                          setProfileModalOpen(true);
+                          if (typeof window !== "undefined" && window.innerWidth <= 768) {
+                            router.push("/profile");
+                          } else {
+                            setProfileModalOpen(true);
+                          }
                         }}
                       >
                         Manage profile
@@ -1754,20 +2049,35 @@ export function ImageAnalyserLanding() {
       <main id="home" className="home-main">
         <section className="home-split container">
           <div className="hero-left">
-            <NextImage
-              src="/home-hero-icons.png"
-              alt="Image to Prompt preview"
-              width={420}
-              height={340}
-              className="hero-left-image"
-              priority
-            />
+            <div style={pathname !== "/" ? { marginBottom: 30 } : undefined}>
+              {content.heroImageUrl.startsWith("http") ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={content.heroImageUrl}
+                  alt={content.heroImageAlt}
+                  width={420}
+                  height={340}
+                  className="hero-left-image"
+                  loading="eager"
+                  decoding="async"
+                />
+              ) : (
+                <NextImage
+                  src={content.heroImageUrl}
+                  alt={content.heroImageAlt}
+                  width={420}
+                  height={340}
+                  className="hero-left-image"
+                  priority
+                />
+              )}
+            </div>
             <h1>
-              <span>Turn Images Into</span>
-              <span>Perfect Prompts</span>
+              <span>{content.heroLeftLine1}</span>
+              <span>{content.heroLeftLine2}</span>
             </h1>
             <p className="hero-mini">
-              Upload any image and get a clean AI-ready prompt for ChatGPT, Gemini, Grok, Leonardo, and more.
+              {content.heroMini}
             </p>
             <p className="hero-mini-line">
               <span>Fast, simple and</span>
@@ -1802,12 +2112,11 @@ export function ImageAnalyserLanding() {
 
           <div id="upload" className="hero-right">
             <h1 className="hero-right-heading">
-              <span>Upload Once.</span>
-              <span>Generate Better Prompts.</span>
+              <span>{content.heroRightLine1}</span>
+              <span>{content.heroRightLine2}</span>
             </h1>
             <p className="upload-support-text">
-              Drop a screenshot, product photo, or design and generate a clean prompt for ChatGPT, Gemini, Grok,
-              Leonardo, and more.
+              {content.uploadSupportText}
             </p>
 
             <div className="usage-strip" aria-live="polite">
@@ -1980,7 +2289,7 @@ export function ImageAnalyserLanding() {
 
       <section className="counter-band container" id="bulk" aria-label="Platform counters">
         <div className="counter-grid">
-          {COUNTER_ITEMS.map((item) => (
+          {content.counterItems.map((item) => (
             <article key={item.label} className="counter-card">
               <CounterValue value={item.value} />
               <p className="counter-label">{item.label}</p>
@@ -1991,45 +2300,35 @@ export function ImageAnalyserLanding() {
         </div>
       </section>
 
-      <section className="container tool-interface-section" id="tool-interface" aria-label="Tool interface">
+      <section className="container tool-interface-section" id="tool-interface" aria-label="How the tool works">
         <div className="tool-section-head">
-          <p className="tool-section-kicker">Tool Interface</p>
-          <h2>Built for speed, clarity, and repeatable prompt quality</h2>
+          <p className="tool-section-kicker">{content.toolInterfaceKicker}</p>
+          <h2>{content.toolInterfaceH2}</h2>
           <p>
-            The interface is designed for focused work: upload quickly, generate structured output, then copy or save
-            prompts in one flow. Session-aware controls keep your plan, credits, and saved prompts synchronized.
+            {content.toolInterfaceIntro}
           </p>
         </div>
         <div className="tool-interface-grid">
-          <article className="tool-interface-card">
-            <BoxIcon className="tool-interface-icon" />
-            <h3>Upload panel</h3>
-            <p>Drag and drop or choose an image. Works best with clear references and production-ready screenshots.</p>
-          </article>
-          <article className="tool-interface-card">
-            <SparkIcon className="tool-interface-icon" />
-            <h3>Generation controls</h3>
-            <p>One-click generate pipeline with credit awareness, fast response, and clear error messaging.</p>
-          </article>
-          <article className="tool-interface-card">
-            <LayersIcon className="tool-interface-icon" />
-            <h3>Prompt output actions</h3>
-            <p>Copy, save, and reuse prompts. Keep only the entries you want in Saved Prompts history.</p>
-          </article>
+          {content.toolInterfaceCards.map((card, i) => (
+            <article key={card.title} className="tool-interface-card">
+              {i === 0 ? <BoxIcon className="tool-interface-icon" /> : i === 1 ? <SparkIcon className="tool-interface-icon" /> : <LayersIcon className="tool-interface-icon" />}
+              <h3>{card.title}</h3>
+              <p>{card.description}</p>
+            </article>
+          ))}
         </div>
       </section>
 
-      <section className="container tool-how-section" id="how-to-use" aria-label="How to use image to prompt converter">
+      <section className="container tool-how-section" id="how-to-use" aria-label="How to use">
         <div className="tool-section-head">
-          <p className="tool-section-kicker">How To Use</p>
-          <h2>How to use Image to Prompt Converter</h2>
+          <p className="tool-section-kicker">{content.howToUseKicker}</p>
+          <h2>{content.howToUseH2}</h2>
           <p>
-            If you are searching how to convert image to prompt online, this workflow is intentionally simple and takes
-            less than a minute.
+            {content.howToUseIntro}
           </p>
         </div>
         <ol className="tool-step-list">
-          {TOOL_STEPS.map((step) => (
+          {content.steps.map((step) => (
             <li key={step.title} className="tool-step-card">
               <h3>{step.title}</h3>
               <p>{step.description}</p>
@@ -2038,13 +2337,13 @@ export function ImageAnalyserLanding() {
         </ol>
       </section>
 
-      <section className="container tool-features-section" id="features" aria-label="Image to prompt features">
+      <section className="container tool-features-section" id="features" aria-label="Features">
         <div className="tool-section-head">
-          <p className="tool-section-kicker">Features</p>
-          <h2>Core capabilities for reliable prompt generation</h2>
+          <p className="tool-section-kicker">{content.featuresKicker}</p>
+          <h2>{content.featuresH2}</h2>
         </div>
         <div className="tool-feature-grid">
-          {TOOL_FEATURES.map((feature) => (
+          {content.features.map((feature) => (
             <article key={feature.title} className="tool-feature-card">
               <h3>{feature.title}</h3>
               <p>{feature.description}</p>
@@ -2053,36 +2352,43 @@ export function ImageAnalyserLanding() {
         </div>
       </section>
 
-      <section className="container tool-example-section" id="example-results" aria-label="Example prompt results">
-        <div className="tool-section-head">
-          <p className="tool-section-kicker">Example Results</p>
-          <h2>Input image to generated prompt examples</h2>
-        </div>
-        <div className="tool-example-grid">
-          {TOOL_EXAMPLES.map((example, index) => (
-            <article
-              key={example.title}
-              className={`tool-example-card ${index % 2 === 1 ? "tool-example-card-flip" : ""}`}
-            >
-              <figure>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={example.imageUrl} alt={example.imageAlt} loading="lazy" />
-              </figure>
-              <div className="tool-example-output">
-                <h3>{example.title}</h3>
-                <p>{example.prompt}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      {content.examples.length > 0 && (
+        <section className="container tool-example-section" id="example-results" aria-label="Example results">
+          <div className="tool-section-head">
+            <p className="tool-section-kicker">{content.examplesKicker}</p>
+            <h2>{content.examplesH2}</h2>
+          </div>
+          <div className="tool-example-grid">
+            {content.examples.map((example, index) => (
+              <article
+                key={example.title}
+                className={`tool-example-card ${index % 2 === 1 ? "tool-example-card-flip" : ""}`}
+              >
+                <figure>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={example.imageUrl} alt={example.imageAlt} loading="lazy" />
+                </figure>
+                <div className="tool-example-output">
+                  <h3>{example.title}</h3>
+                  <p>{example.prompt}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       <section className="container tool-usecases-section" id="use-cases" aria-label="Use cases">
         <div className="tool-section-head">
-          <p className="tool-section-kicker">Use Cases</p>
-          <h2>Who uses this image to prompt tool</h2>
+          <p className="tool-section-kicker">{content.useCasesKicker}</p>
+          <h2>{content.useCasesH2}</h2>
         </div>
-        <div className="tool-usecase-carousel-wrap">
+        <div
+          className="tool-usecase-carousel-wrap"
+          style={
+            { "--usecase-slides": Math.ceil(content.useCases.length / useCaseCardsPerSlide) } as CSSProperties
+          }
+        >
           <button
             type="button"
             className="tool-usecase-carousel-btn tool-usecase-carousel-btn-prev"
@@ -2096,14 +2402,14 @@ export function ImageAnalyserLanding() {
             <div
               className="tool-usecase-carousel-track"
               style={{
-                width: `${Math.ceil(TOOL_USE_CASES.length / 2) * 100}%`,
-                transform: `translateX(-${useCaseSlide * (100 / Math.ceil(TOOL_USE_CASES.length / 2))}%)`
+                width: `${Math.ceil(content.useCases.length / useCaseCardsPerSlide) * 100}%`,
+                transform: `translateX(-${Math.min(useCaseSlide, Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1) * (100 / Math.ceil(content.useCases.length / useCaseCardsPerSlide))}%)`
               }}
             >
-              {Array.from({ length: Math.ceil(TOOL_USE_CASES.length / 2) }).map((_, slideIndex) => (
+              {Array.from({ length: Math.ceil(content.useCases.length / useCaseCardsPerSlide) }).map((_, slideIndex) => (
                 <div key={slideIndex} className="tool-usecase-carousel-slide">
-                  {TOOL_USE_CASES.slice(slideIndex * 2, slideIndex * 2 + 2).map((useCase, i) => {
-                    const index = slideIndex * 2 + i;
+                  {content.useCases.slice(slideIndex * useCaseCardsPerSlide, slideIndex * useCaseCardsPerSlide + useCaseCardsPerSlide).map((useCase, i) => {
+                    const index = slideIndex * useCaseCardsPerSlide + i;
                     const IconComponent = USE_CASE_ICONS[index];
                     return (
                       <article key={useCase.title} className="tool-usecase-card tool-usecase-carousel-card">
@@ -2125,16 +2431,16 @@ export function ImageAnalyserLanding() {
             type="button"
             className="tool-usecase-carousel-btn tool-usecase-carousel-btn-next"
             onClick={() =>
-              setUseCaseSlide((s) => Math.min(Math.ceil(TOOL_USE_CASES.length / 2) - 1, s + 1))
+              setUseCaseSlide((s) => Math.min(Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1, s + 1))
             }
-            disabled={useCaseSlide >= Math.ceil(TOOL_USE_CASES.length / 2) - 1}
+            disabled={useCaseSlide >= Math.ceil(TOOL_USE_CASES.length / useCaseCardsPerSlide) - 1}
             aria-label="Next use cases"
           >
             <ChevronRightIcon aria-hidden />
           </button>
         </div>
         <div className="tool-usecase-carousel-dots" role="tablist" aria-label="Use case slides">
-          {Array.from({ length: Math.ceil(TOOL_USE_CASES.length / 2) }).map((_, i) => (
+          {Array.from({ length: Math.ceil(content.useCases.length / useCaseCardsPerSlide) }).map((_, i) => (
             <button
               key={i}
               type="button"
@@ -2148,13 +2454,13 @@ export function ImageAnalyserLanding() {
         </div>
       </section>
 
-      <section className="container tool-benefits-section" id="benefits" aria-label="Tool benefits">
+      <section className="container tool-benefits-section" id="benefits" aria-label="Benefits">
         <div className="tool-section-head">
-          <p className="tool-section-kicker">Benefits</p>
-          <h2>Why teams prefer this over manual prompting</h2>
+          <p className="tool-section-kicker">{content.benefitsKicker}</p>
+          <h2>{content.benefitsH2}</h2>
         </div>
         <div className="tool-benefit-grid">
-          {TOOL_BENEFITS.map((benefit) => (
+          {content.benefits.map((benefit) => (
             <article key={benefit.title} className="tool-benefit-card">
               <h3>{benefit.title}</h3>
               <p>{benefit.description}</p>
@@ -2166,7 +2472,7 @@ export function ImageAnalyserLanding() {
       <section className="pricing-section container" id="pricing" aria-label="Plans and pricing">
         <h2 className="pricing-heading">Plans and Pricing</h2>
         <p className="pricing-subtitle">
-          Save when you pay yearly. Switch plans anytime from your profile. Showing{" "}
+          {content.pricingSubtitlePrefix}Showing{" "}
           <strong>{resolvedPricingContext.currency}</strong> pricing for{" "}
           {resolvedPricingContext.country === "UNKNOWN" ? "your region" : resolvedPricingContext.country}.
         </p>
@@ -2258,7 +2564,7 @@ export function ImageAnalyserLanding() {
           />
         </div>
         <div className="tool-faq-list">
-          {TOOL_FAQS.map((item, index) => (
+          {content.faqs.map((item, index) => (
             <details key={item.question} open={index === 0} className="tool-faq-item">
               <summary>{item.question}</summary>
               <p>{item.answer}</p>
@@ -2270,15 +2576,14 @@ export function ImageAnalyserLanding() {
       <section className="container tool-seo-content-section" id="seo-content" aria-label="Image to prompt converter guide">
         <div className="tool-seo-guide-card">
           <div className="tool-seo-guide-header">
-            <p className="tool-section-kicker">Guide</p>
-            <h2 className="tool-seo-guide-title">Image to Prompt Converter: complete practical guide</h2>
+            <p className="tool-section-kicker">{content.seoGuideKicker}</p>
+            <h2 className="tool-seo-guide-title">{content.seoGuideTitle}</h2>
             <p className="tool-seo-guide-intro">
-              This long-form section explains core concepts, workflow choices, and prompt quality fundamentals without
-              keyword stuffing.
+              {content.seoGuideIntro}
             </p>
           </div>
           <article className="tool-seo-article">
-            {SEO_COPY.map((section) => (
+            {content.seoCopy.map((section) => (
               <div key={section.heading} className="tool-seo-guide-block">
                 <h3>{section.heading}</h3>
                 {section.paragraphs.map((paragraph) => (
@@ -2292,28 +2597,17 @@ export function ImageAnalyserLanding() {
 
       <section className="container tool-trust-section" id="trust-signals" aria-label="Trust and performance">
         <div className="tool-section-head">
-          <p className="tool-section-kicker">Trust + Performance</p>
-          <h2>Built with practical trust signals</h2>
+          <p className="tool-section-kicker">{content.trustKicker}</p>
+          <h2>{content.trustH2}</h2>
         </div>
         <div className="tool-trust-grid">
-          <article>
-            <ShieldIcon className="tool-trust-icon" />
-            <h3>Privacy-focused handling</h3>
-            <p>
-              No permanent image storage in default generation flow, plus account-based access and user-managed saved
-              prompts.
-            </p>
-          </article>
-          <article>
-            <ServerIcon className="tool-trust-icon" />
-            <h3>Secure by default</h3>
-            <p>HTTPS delivery, authenticated APIs, CDN-backed assets, and stable session controls across surfaces.</p>
-          </article>
-          <article>
-            <CheckIcon className="tool-trust-icon" />
-            <h3>Fast response flow</h3>
-            <p>Optimized for low-friction generation with a fast interface tuned for sub-two-second interactions.</p>
-          </article>
+          {content.trustCards.map((card, i) => (
+            <article key={card.title}>
+              {i === 0 ? <ShieldIcon className="tool-trust-icon" /> : i === 1 ? <ServerIcon className="tool-trust-icon" /> : <CheckIcon className="tool-trust-icon" />}
+              <h3>{card.title}</h3>
+              <p>{card.description}</p>
+            </article>
+          ))}
         </div>
       </section>
 
@@ -2350,6 +2644,81 @@ export function ImageAnalyserLanding() {
                           {resultSaved && copied ? "Saved · Copied" : resultSaved ? "Saved" : "Copied"}
                         </span>
                       )}
+                      <div className="result-modal-share-wrap" ref={shareMenuRef}>
+                        <button
+                          type="button"
+                          className={`result-modal-head-btn ${shareMenuOpen ? "is-active" : ""}`}
+                          onClick={() => setShareMenuOpen((v) => !v)}
+                          aria-label="Share prompt"
+                          title="Share prompt"
+                          aria-expanded={shareMenuOpen}
+                          aria-haspopup="true"
+                        >
+                          <ShareIcon className="button-icon" />
+                        </button>
+                        {shareMenuOpen && (
+                          <div className="result-modal-share-menu" role="menu">
+                            <a
+                              href={
+                                description
+                                  ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                                      description.length > 270 ? `${description.slice(0, 270)}…` : description
+                                    )}`
+                                  : "#"
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              role="menuitem"
+                              className="result-modal-share-item"
+                              onClick={() => setShareMenuOpen(false)}
+                            >
+                              {SHARE_X_SVG}
+                              <span>X</span>
+                            </a>
+                            <a
+                              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+                                typeof window !== "undefined" ? window.location.href : ""
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              role="menuitem"
+                              className="result-modal-share-item"
+                              onClick={() => setShareMenuOpen(false)}
+                            >
+                              {SHARE_LINKEDIN_SVG}
+                              <span>LinkedIn</span>
+                            </a>
+                            <a
+                              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+                                typeof window !== "undefined" ? window.location.href : ""
+                              )}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              role="menuitem"
+                              className="result-modal-share-item"
+                              onClick={() => setShareMenuOpen(false)}
+                            >
+                              {SHARE_FACEBOOK_SVG}
+                              <span>Facebook</span>
+                            </a>
+                            <a
+                              href={
+                                description
+                                  ? `https://wa.me/?text=${encodeURIComponent(description)}`
+                                  : "#"
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              role="menuitem"
+                              className="result-modal-share-item"
+                              onClick={() => setShareMenuOpen(false)}
+                            >
+                              {SHARE_WHATSAPP_SVG}
+                              <span>WhatsApp</span>
+                            </a>
+                          </div>
+                        )}
+                      </div>
                       <button
                         type="button"
                         onClick={onSaveResult}
@@ -2398,6 +2767,31 @@ export function ImageAnalyserLanding() {
                   </button>
                 </div>
                 <div className="result-modal-llm-icons" aria-label="Supported models">
+                  <div className="result-modal-lang-tags">
+                    {RESULT_TRANSLATE_LANGUAGES.map(({ code, label }) => {
+                      const isTranslating = resultTranslateLang === code;
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          className={`result-modal-lang-tag ${isTranslating ? "is-translating" : ""}`}
+                          onClick={() => void onTranslatePrompt(code)}
+                          disabled={resultTranslateBusy || !authToken}
+                          title="Translate prompt (1 credit)"
+                          aria-label={
+                            isTranslating
+                              ? `Translating to ${label}…`
+                              : `Translate prompt to ${label} (1 credit)`
+                          }
+                        >
+                          {isTranslating ? "Generating…" : label}
+                        </button>
+                      );
+                    })}
+                    {resultTranslateError ? (
+                      <span className="result-modal-translate-error">{resultTranslateError}</span>
+                    ) : null}
+                  </div>
                   <span className="result-modal-llm-note">Paste into AI and generate</span>
                   {MODAL_LLM_IMAGES.map((sample) => (
                     <button
@@ -2827,6 +3221,12 @@ export function ImageAnalyserLanding() {
           <div className="footer-simple-top">
             <nav className="footer-simple-links" aria-label="Product and tool pages">
               <a href="#home">Image to Prompt</a>
+              <a href="/image-to-prompt-converter">Image to Prompt Converter</a>
+              <a href="/image-prompt-generator">Image Prompt Generator</a>
+              <a href="/gemini-ai-photo-prompt">Gemini AI Photo Prompt</a>
+              <a href="/ai-gemini-photo-prompt">AI Gemini Photo Prompt</a>
+              <a href="/google-gemini-ai-photo-prompt">Google Gemini AI Photo Prompt</a>
+              <a href="/gemini-prompt">Gemini Prompt</a>
               <a href="/bulk">Bulk Image to Prompt</a>
               <a href="/pricing">Pricing</a>
               <a href="/chrome-extension">Chrome Extension</a>

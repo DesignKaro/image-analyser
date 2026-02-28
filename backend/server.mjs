@@ -339,6 +339,11 @@ async function bootstrap() {
         return;
       }
 
+      if (req.method === "POST" && pathname === "/api/translate-prompt") {
+        await handleTranslatePrompt(req, res);
+        return;
+      }
+
       json(res, 404, { ok: false, error: "Not found." });
     } catch (error) {
       const status = error instanceof HttpError ? error.status : 500;
@@ -1348,6 +1353,77 @@ async function handleDescribeImage(req, res) {
       monthlyQuota: plan.monthlyQuota,
       priceUsdCents: plan.priceUsdCents
     },
+    usage: usageAfter
+  });
+}
+
+const TRANSLATE_LANGUAGES = {
+  hi: "Hindi",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  ja: "Japanese"
+};
+
+async function handleTranslatePrompt(req, res) {
+  const actor = await resolveActor(req, { requireUser: true });
+
+  const body = await readJsonBody(req, MAX_BODY_BYTES);
+  const targetLangCode = typeof body?.targetLanguage === "string" ? body.targetLanguage.trim().toLowerCase() : "";
+  const languageName = TRANSLATE_LANGUAGES[targetLangCode];
+  if (!languageName) {
+    throw new HttpError(400, "Invalid target language. Use: hi, es, fr, de, ja.");
+  }
+
+  const description = typeof body?.description === "string" ? body.description.trim() : "";
+  if (!description) {
+    throw new HttpError(400, "Description (prompt) is required.");
+  }
+
+  const imageInput = resolveImageInput(body?.imageDataUrl, body?.imageUrl);
+  const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim() : DEFAULT_MODEL;
+  const apiKey = getOpenAiApiKey();
+
+  const plan = actor.subscription || PLAN_CONFIG.guest;
+  const usageBefore = await buildUsageSummary(actor.subjectType, actor.subjectKey, plan.monthlyQuota);
+
+  if (usageBefore.limit !== null && usageBefore.used >= usageBefore.limit) {
+    throw new HttpError(402, "Monthly usage limit reached. Upgrade your plan to continue.");
+  }
+
+  const translatePrompt = `The user has provided an image and its description in English below. Rewrite the description entirely in ${languageName}. Keep the same structure, detail level, and image-generation focus. Output only the translated prompt text. No wrappers, labels, or markdown.
+
+Original description:
+${description}`;
+
+  const rawDescription = await analyzeImage({
+    apiKey,
+    model,
+    prompt: translatePrompt,
+    imageInput
+  });
+  const translatedDescription = normalizePromptOutput(rawDescription) || rawDescription;
+
+  const requestId = randomUUID();
+  const consumed = await consumeUsage({
+    subjectType: actor.subjectType,
+    subjectKey: actor.subjectKey,
+    limit: plan.monthlyQuota,
+    planCode: plan.planCode,
+    requestId
+  });
+  if (!consumed) {
+    throw new HttpError(402, "Monthly usage limit reached. Upgrade your plan to continue.");
+  }
+
+  const usageAfter = await buildUsageSummary(actor.subjectType, actor.subjectKey, plan.monthlyQuota);
+
+  json(res, 200, {
+    ok: true,
+    model,
+    description: translatedDescription,
+    requestId,
+    targetLanguage: targetLangCode,
     usage: usageAfter
   });
 }

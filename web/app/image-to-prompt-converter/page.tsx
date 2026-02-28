@@ -25,5 +25,5 @@ export const metadata: Metadata = {
 };
 
 export default function ImageToPromptConverterPage() {
-  return <ImageAnalyserLanding />;
+  return <ImageAnalyserLanding variant="image-to-prompt-converter" />;
 }
