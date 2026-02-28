@@ -145,20 +145,7 @@ a {
 
 @media (max-width: 768px) {
   .sticky-share {
-    top: auto;
-    bottom: 1rem;
-    transform: none;
-    right: 1rem;
-  }
-  .sticky-share-inner {
-    flex-direction: row;
-    border-radius: 12px;
-    border-right: 1px solid #000;
-    padding: 8px 12px;
-  }
-  .sticky-share-label {
-    margin-bottom: 0;
-    margin-right: 4px;
+    display: none;
   }
 }
 
@@ -5092,10 +5079,6 @@ a {
     flex-wrap: wrap;
     gap: 6px;
     min-width: 0;
-  }
-
-  .result-modal-share-wrap {
-    display: none;
   }
 
   .result-modal-head button {
