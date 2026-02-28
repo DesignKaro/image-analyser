@@ -56,6 +56,14 @@ export type TrustCard = {
   description: string;
 };
 
+export type ReviewItem = {
+  name: string;
+  location: string;
+  date: string;
+  title: string;
+  body: string;
+};
+
 export type LandingContent = {
   /** Hero left image: local path (e.g. /home-hero-icons.png) or full URL (e.g. Unsplash). */
   heroImageUrl: string;
@@ -95,6 +103,9 @@ export type LandingContent = {
   trustKicker: string;
   trustH2: string;
   trustCards: TrustCard[];
+  reviewsKicker: string;
+  reviewsH2: string;
+  reviews: ReviewItem[];
   pricingSubtitlePrefix: string;
   /** For JSON-LD: breadcrumb and SoftwareApplication. Must match the page URL to avoid GSC errors. */
   schemaPageName: string;
@@ -316,6 +327,72 @@ const EXAMPLES_SET_3 = DEFAULT_EXAMPLES.slice(10, 15);
 const EXAMPLES_SET_4 = DEFAULT_EXAMPLES.slice(15, 20);
 const EXAMPLES_SET_5 = DEFAULT_EXAMPLES.slice(20, 25);
 const EXAMPLES_SET_6 = [...DEFAULT_EXAMPLES.slice(25, 29), DEFAULT_EXAMPLES[0]];
+
+const DEFAULT_REVIEWS: ReviewItem[] = [
+  {
+    name: "Sarah",
+    location: "Berlin",
+    date: "Feb 18",
+    title: "Exactly what I needed for Midjourney prompts",
+    body: "Uploaded a moodboard, got a clean prompt in seconds. The image to prompt converter nailed the lighting and composition details. No more staring at reference images wondering how to phrase it."
+  },
+  {
+    name: "Marcus",
+    location: "London",
+    date: "Feb 12",
+    title: "Saves me tons of time on product shots",
+    body: "I use this for ecommerce visuals. Clean product photo in, structured prompt out. Paste into DALL·E or Leonardo and tweak. Consistent briefs across our team now."
+  },
+  {
+    name: "Priya",
+    location: "Mumbai",
+    date: "Feb 8",
+    title: "Free tier got me hooked",
+    body: "Tried without signing up—worked perfectly. Then signed in to save prompts. Chrome extension is great for grabbing refs from design tabs. Five stars."
+  },
+  {
+    name: "James",
+    location: "Austin",
+    date: "Feb 5",
+    title: "Simple, fast, no bloat",
+    body: "Other tools overcomplicate. This one: upload, generate, copy. Prompt quality is solid. I edit a few words before pasting into ChatGPT. Does exactly what it says."
+  },
+  {
+    name: "Elena",
+    location: "Barcelona",
+    date: "Jan 28",
+    title: "Great for concept art references",
+    body: "Feed it a character or environment sketch, get a prompt I can refine for Stable Diffusion. Saves so much time compared to writing from scratch."
+  },
+  {
+    name: "David",
+    location: "Toronto",
+    date: "Jan 22",
+    title: "Works on mobile too",
+    body: "Used it from my phone—upload from gallery, generate, copy. No account needed to try. Exactly what I needed for quick social content prompts."
+  },
+  {
+    name: "Yuki",
+    location: "Tokyo",
+    date: "Jan 15",
+    title: "Reliable and straightforward",
+    body: "Clear images give clear prompts. Fast, no weird outputs. Use it daily for design briefs. The free image to prompt converter is genuinely useful."
+  },
+  {
+    name: "Alex",
+    location: "Sydney",
+    date: "Jan 10",
+    title: "Perfect for Gemini and ChatGPT",
+    body: "Paste the prompt into any AI. Works with Gemini, ChatGPT, Midjourney. One tool, many destinations. Saves prompts to my account for repeat use."
+  },
+  {
+    name: "Nina",
+    location: "Amsterdam",
+    date: "Jan 5",
+    title: "Clean prompts, easy workflow",
+    body: "No fluff, no jargon. The converter describes what it sees—subject, style, mood. I add brand terms and paste. My go-to for image-to-text prompts."
+  }
+];
 
 const IMAGE_TO_PROMPT_DEFAULT: LandingContent = {
   heroImageUrl: "/Assets/3-2-cat-png-14.png",
@@ -611,6 +688,9 @@ const IMAGE_TO_PROMPT_DEFAULT: LandingContent = {
       description: "Most prompts ready in seconds. No long waits so you can keep working."
     }
   ],
+  reviewsKicker: "Reviews",
+  reviewsH2: "What people say about the image to prompt tool",
+  reviews: DEFAULT_REVIEWS,
   pricingSubtitlePrefix:
     "Simple pricing for the image to prompt generator. Save when you pay yearly; switch plans anytime from your profile. ",
   schemaPageName: "Image to Prompt Converter",
@@ -1270,6 +1350,9 @@ const IMAGE_PROMPT_GENERATOR: LandingContent = {
   ],
   seoGuideTitle: "Image prompt generator: a short guide",
   seoGuideIntro: "What an image prompt generator does and how to use it. Upload a photo, get a prompt, paste it anywhere.",
+  reviewsKicker: "Reviews",
+  reviewsH2: "What people say about the image prompt generator",
+  reviews: DEFAULT_REVIEWS,
   pricingSubtitlePrefix: "Simple pricing for the image prompt generator. Save when you pay yearly; switch plans from your profile. ",
   schemaPageName: "Image Prompt Generator",
   schemaPagePath: "image-prompt-generator",

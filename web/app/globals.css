@@ -842,6 +842,79 @@ a {
 .tool-example-section,
 .tool-seo-content-section,
 .tool-related-section,
+.tool-reviews-section {
+  margin: 80px auto;
+  max-width: 1100px;
+  padding: 0;
+}
+
+.tool-reviews-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.tool-review-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tool-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.tool-review-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tool-review-name {
+  font-weight: 600;
+  color: #111827;
+  font-size: 0.95rem;
+}
+
+.tool-review-location {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.tool-review-date {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.tool-review-stars {
+  margin-bottom: 10px;
+}
+
+.tool-review-star {
+  color: #22c55e;
+  font-size: 1rem;
+}
+
+.tool-review-title {
+  margin: 0 0 8px;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1.35;
+}
+
+.tool-review-body {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #475569;
+  line-height: 1.6;
+}
+
 .tool-trust-section {
   margin: 80px auto;
   max-width: 1100px;
@@ -1446,7 +1519,8 @@ a {
 @media (max-width: 1024px) {
   .tool-interface-grid,
   .tool-feature-grid,
-  .tool-trust-grid {
+  .tool-trust-grid,
+  .tool-reviews-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1465,7 +1539,8 @@ a {
   .tool-faq-section,
   .tool-seo-content-section,
   .tool-related-section,
-  .tool-trust-section {
+  .tool-trust-section,
+  .tool-reviews-section {
     border-radius: 16px;
     padding: 16px;
   }
@@ -1477,7 +1552,8 @@ a {
   .tool-benefit-grid,
   .tool-example-grid,
   .tool-related-grid,
-  .tool-trust-grid {
+  .tool-trust-grid,
+  .tool-reviews-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -5016,6 +5092,10 @@ a {
     flex-wrap: wrap;
     gap: 6px;
     min-width: 0;
+  }
+
+  .result-modal-share-wrap {
+    display: none;
   }
 
   .result-modal-head button {

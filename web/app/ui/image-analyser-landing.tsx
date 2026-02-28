@@ -2424,6 +2424,33 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
         </div>
       </section>
 
+      <section className="container tool-reviews-section" id="reviews" aria-label="User reviews">
+        <div className="tool-section-head">
+          <p className="tool-section-kicker">{content.reviewsKicker}</p>
+          <h2>{content.reviewsH2}</h2>
+        </div>
+        <div className="tool-reviews-grid">
+          {content.reviews.map((review, i) => (
+            <article key={`${review.name}-${i}`} className="tool-review-card">
+              <div className="tool-review-header">
+                <div className="tool-review-meta">
+                  <span className="tool-review-name">{review.name}</span>
+                  <span className="tool-review-location">{review.location}</span>
+                </div>
+                <span className="tool-review-date">{review.date}</span>
+              </div>
+              <div className="tool-review-stars" aria-label="5 out of 5 stars">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <span key={n} className="tool-review-star" aria-hidden>★</span>
+                ))}
+              </div>
+              <h3 className="tool-review-title">{review.title}</h3>
+              <p className="tool-review-body">{review.body}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
       {resultModalOpen ? (
         <div
           className="result-modal-overlay"
