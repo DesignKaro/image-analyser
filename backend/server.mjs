@@ -50,7 +50,7 @@ const server = http.createServer(async (req, res) => {
     const imageInput = resolveImageInput(body?.imageDataUrl, body?.imageUrl);
     const apiKey = getOpenAiApiKey();
 
-    const description = await analyzeImage({
+    const analysis = await analyzeImage({
       apiKey,
       model,
       prompt,
@@ -60,7 +60,8 @@ const server = http.createServer(async (req, res) => {
     json(res, 200, {
       ok: true,
       model,
-      description
+      title: analysis.title,
+      description: analysis.description
     });
   } catch (error) {
     const status = error instanceof HttpError ? error.status : 500;
@@ -88,7 +89,13 @@ DO:
 - Write as if you are there: what do you notice first? What feeling does it give you?
 - Be specific and vivid. "Feathers glowing like painted velvet" not "vibrant feathers"
 - End on something that lingers—a feeling, a detail, or a quiet observation
-- Sound like a human who cares about the moment, not a machine summarizing it.`;
+- Sound like a human who cares about the moment, not a machine summarizing it.
+
+Output format (strict):
+- Return only valid JSON, with no markdown fences.
+- Use exactly this shape: {"title":"...","description":"..."}
+- "title": 3-8 words, specific and evocative, no ending punctuation.
+- "description": 2-4 short sentences following all style rules above.`;
 
 function buildPrompt(rawPrompt) {
   if (typeof rawPrompt === "string" && rawPrompt.trim()) {
@@ -164,12 +171,13 @@ async function analyzeImage({ apiKey, model, prompt, imageInput }) {
     throw new HttpError(response.status, parseOpenAiError(response.status, payload));
   }
 
-  const text = extractDescription(payload);
-  if (!text) {
+  const rawText = extractAssistantText(payload);
+  const analysis = parseAnalysis(rawText);
+  if (!analysis.description) {
     throw new HttpError(502, "OpenAI returned no description.");
   }
 
-  return text;
+  return analysis;
 }
 
 function parseOpenAiError(status, payload) {
@@ -191,7 +199,7 @@ function parseOpenAiError(status, payload) {
   return `OpenAI request failed (${status}).`;
 }
 
-function extractDescription(payload) {
+function extractAssistantText(payload) {
   const content = payload?.choices?.[0]?.message?.content;
 
   if (typeof content === "string" && content.trim()) {
@@ -210,6 +218,90 @@ function extractDescription(payload) {
   }
 
   return "";
+}
+
+function parseAnalysis(rawText) {
+  const text = typeof rawText === "string" ? rawText.trim() : "";
+  if (!text) {
+    return { title: "", description: "" };
+  }
+
+  const structured = parseAnalysisJson(text) || parseLabeledAnalysis(text);
+  if (structured?.description) {
+    return {
+      title: structured.title || buildFallbackTitle(structured.description),
+      description: structured.description
+    };
+  }
+
+  return {
+    title: buildFallbackTitle(text),
+    description: text
+  };
+}
+
+function parseAnalysisJson(text) {
+  const withoutFence = text
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    const parsed = JSON.parse(withoutFence);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
+    const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
+    if (!description) {
+      return null;
+    }
+
+    return { title, description };
+  } catch {
+    return null;
+  }
+}
+
+function parseLabeledAnalysis(text) {
+  const match = text.match(/title:\s*(.+?)\n+description:\s*([\s\S]+)/i);
+  if (!match) {
+    return null;
+  }
+
+  const title = String(match[1] || "").trim();
+  const description = String(match[2] || "").trim();
+  if (!description) {
+    return null;
+  }
+
+  return { title, description };
+}
+
+function buildFallbackTitle(description) {
+  const sentence = String(description)
+    .trim()
+    .split(/(?<=[.!?])\s+/)[0]
+    ?.trim();
+
+  if (!sentence) {
+    return "Image Moment";
+  }
+
+  const cleaned = sentence.replace(/["'`]/g, "").replace(/[^a-zA-Z0-9\s-]/g, " ").trim();
+  if (!cleaned) {
+    return "Image Moment";
+  }
+
+  const words = cleaned.split(/\s+/).filter(Boolean).slice(0, 6);
+  if (!words.length) {
+    return "Image Moment";
+  }
+
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function isHttpUrl(value) {

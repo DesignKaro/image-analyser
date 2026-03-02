@@ -137,7 +137,14 @@ async function onDocumentClick(event) {
       throw new Error(response?.error || "Analysis request failed.");
     }
 
-    showOverlay({ state: "success", text: response.description }, anchor);
+    showOverlay(
+      {
+        state: "success",
+        title: typeof response?.title === "string" ? response.title : "",
+        text: typeof response?.description === "string" ? response.description : ""
+      },
+      anchor
+    );
     scheduleOverlayHide(AUTO_HIDE_MS);
   } catch (error) {
     if (requestId !== activeRequestId) {
@@ -395,14 +402,20 @@ function showOverlay(payload, anchor) {
   clearTimeout(hideTimer);
 
   const root = ensureOverlay();
+  const titleEl = root.querySelector(".ia-title");
   const textEl = root.querySelector(".ia-text");
   const spinner = root.querySelector(".ia-spinner");
   const statusPill = root.querySelector(".ia-state-pill");
 
-  if (!textEl || !spinner || !statusPill) {
+  if (!titleEl || !textEl || !spinner || !statusPill) {
     return;
   }
 
+  const rawTitle = typeof payload?.title === "string" ? payload.title.trim() : "";
+  const showTitle = payload.state === "success" && Boolean(rawTitle);
+
+  titleEl.textContent = showTitle ? rawTitle : "";
+  titleEl.hidden = !showTitle;
   textEl.textContent = payload.text || "";
   root.dataset.state = payload.state;
   spinner.hidden = payload.state !== "loading";
@@ -467,7 +480,10 @@ function ensureOverlay() {
       </div>
       <div class="ia-body">
         <span class="ia-spinner" aria-hidden="true"></span>
-        <p class="ia-text"></p>
+        <div class="ia-copy-body">
+          <p class="ia-title" hidden></p>
+          <p class="ia-text"></p>
+        </div>
       </div>
     </div>
   `;
@@ -487,8 +503,11 @@ function ensureOverlay() {
       event.preventDefault();
       event.stopPropagation();
 
+      const titleEl = root.querySelector(".ia-title");
       const textEl = root.querySelector(".ia-text");
-      const textToCopy = textEl?.textContent?.trim() || "";
+      const title = !titleEl?.hidden ? titleEl?.textContent?.trim() || "" : "";
+      const description = textEl?.textContent?.trim() || "";
+      const textToCopy = [title, description].filter(Boolean).join("\n\n");
       if (!textToCopy) {
         return;
       }

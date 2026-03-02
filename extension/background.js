@@ -1,4 +1,4 @@
-// Live backend (switch back when needed): "https://img.connectiqworld.cloud/backend"
+// Live backend (switch back when done testing): "https://img.connectiqworld.cloud/backend"
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8787";
 const OPENAI_MODEL = "gpt-4o-mini";
 const ENABLED_KEY = "enabled";
@@ -70,8 +70,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   handleAnalyzeImageMessage(message.payload)
-    .then((description) => {
-      sendResponse({ ok: true, description });
+    .then((analysis) => {
+      sendResponse({
+        ok: true,
+        title: analysis.title,
+        description: analysis.description
+      });
     })
     .catch((error) => {
       sendResponse({ ok: false, error: toUserError(error) });
@@ -295,7 +299,13 @@ DO:
 - Write as if you are there: what do you notice first? What feeling does it give you?
 - Be specific and vivid. "Feathers glowing like painted velvet" not "vibrant feathers"
 - End on something that lingers—a feeling, a detail, or a quiet observation
-- Sound like a human who cares about the moment, not a machine summarizing it.`;
+- Sound like a human who cares about the moment, not a machine summarizing it.
+
+Output format (strict):
+- Return only valid JSON, with no markdown fences.
+- Use exactly this shape: {"title":"...","description":"..."}
+- "title": 3-8 words, specific and evocative, no ending punctuation.
+- "description": 2-4 short sentences following all style rules above.`;
 
 function buildPrompt(payload) {
   const altText = typeof payload?.altText === "string" ? payload.altText.trim() : "";
@@ -342,20 +352,112 @@ async function requestVisionDescription({ backendUrl, prompt, imageDataUrl, imag
     throw new Error(message || `Backend request failed (${response.status}).`);
   }
 
-  const text = extractDescription(payload);
-  if (!text) {
+  const analysis = extractAnalysis(payload);
+  if (!analysis.description) {
     throw new Error("Backend returned no description.");
   }
 
-  return text;
+  return analysis;
 }
 
-function extractDescription(payload) {
-  if (typeof payload?.description === "string") {
-    return payload.description.trim();
+function extractAnalysis(payload) {
+  const directDescription = typeof payload?.description === "string" ? payload.description.trim() : "";
+  const directTitle = typeof payload?.title === "string" ? payload.title.trim() : "";
+
+  if (directDescription) {
+    const parsed = parseAnalysisText(directDescription);
+    if (parsed.description) {
+      return {
+        title: parsed.title || directTitle || buildFallbackTitle(parsed.description),
+        description: parsed.description
+      };
+    }
+
+    return {
+      title: directTitle || buildFallbackTitle(directDescription),
+      description: directDescription
+    };
   }
 
-  return "";
+  return { title: "", description: "" };
+}
+
+function parseAnalysisText(text) {
+  const jsonParsed = parseAnalysisJson(text);
+  if (jsonParsed?.description) {
+    return jsonParsed;
+  }
+
+  const labeledParsed = parseLabeledAnalysis(text);
+  if (labeledParsed?.description) {
+    return labeledParsed;
+  }
+
+  return { title: "", description: "" };
+}
+
+function parseAnalysisJson(text) {
+  const normalized = String(text)
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+
+  try {
+    const parsed = JSON.parse(normalized);
+    if (!parsed || typeof parsed !== "object") {
+      return null;
+    }
+
+    const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
+    const description = typeof parsed.description === "string" ? parsed.description.trim() : "";
+    if (!description) {
+      return null;
+    }
+
+    return { title, description };
+  } catch {
+    return null;
+  }
+}
+
+function parseLabeledAnalysis(text) {
+  const match = String(text).match(/title:\s*(.+?)\n+description:\s*([\s\S]+)/i);
+  if (!match) {
+    return null;
+  }
+
+  const title = String(match[1] || "").trim();
+  const description = String(match[2] || "").trim();
+  if (!description) {
+    return null;
+  }
+
+  return { title, description };
+}
+
+function buildFallbackTitle(description) {
+  const sentence = String(description)
+    .trim()
+    .split(/(?<=[.!?])\s+/)[0]
+    ?.trim();
+
+  if (!sentence) {
+    return "Image Moment";
+  }
+
+  const cleaned = sentence.replace(/["'`]/g, "").replace(/[^a-zA-Z0-9\s-]/g, " ").trim();
+  if (!cleaned) {
+    return "Image Moment";
+  }
+
+  const words = cleaned.split(/\s+/).filter(Boolean).slice(0, 6);
+  if (!words.length) {
+    return "Image Moment";
+  }
+
+  return words
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 }
 
 function toUserError(error) {
