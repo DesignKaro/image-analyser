@@ -44,7 +44,7 @@ const sections: LegalSection[] = [
   {
     title: "Contact",
     paragraphs: [
-      "For partnerships, support, legal, or compliance questions, email us at abhi@argro.co."
+      "For partnerships, support, legal, or compliance questions, email us at imagetopromptgenerate@gmail.com."
     ]
   }
 ];

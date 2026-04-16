@@ -25,30 +25,16 @@ export const PRICING_CARDS: Array<{
   {
     code: "pro",
     title: "Pro",
-    description: "Great for creators and small teams",
+    description: "For serious creators and teams",
     features: [
       "200 prompts per month",
       "All Free features",
       "Bulk upload support",
       "Priority processing",
-      "Up to 3 seats"
+      "Add top-up credits anytime"
     ],
     popular: true,
     cta: "Get started with Pro"
-  },
-  {
-    code: "unlimited",
-    title: "Unlimited",
-    description: "For teams and heavy usage",
-    features: [
-      "Unlimited prompts",
-      "Everything in Pro",
-      "API access",
-      "Up to 10 seats",
-      "Dedicated support"
-    ],
-    dark: true,
-    cta: "Get started with Unlimited"
   }
 ];
 
@@ -58,8 +44,7 @@ export const PLAN_OPTION_META: Array<{
   quota: string;
 }> = [
   { code: "free", label: "Free", quota: "20 prompts/month" },
-  { code: "pro", label: "Pro", quota: "200 prompts/month" },
-  { code: "unlimited", label: "Unlimited", quota: "Unlimited prompts" }
+  { code: "pro", label: "Pro", quota: "200 prompts/month" }
 ];
 
 export const DEFAULT_PRICING_CONTEXT: PricingContextSnapshot = {
@@ -67,8 +52,17 @@ export const DEFAULT_PRICING_CONTEXT: PricingContextSnapshot = {
   currency: "USD",
   plans: [
     { code: "free", monthlyAmountSubunits: 0, annualAmountSubunits: 0, monthlyQuota: 20 },
-    { code: "pro", monthlyAmountSubunits: 2000, annualAmountSubunits: 19200, monthlyQuota: 200 },
-    { code: "unlimited", monthlyAmountSubunits: 6000, annualAmountSubunits: 57600, monthlyQuota: null }
+    { code: "pro", monthlyAmountSubunits: 2000, annualAmountSubunits: 19200, monthlyQuota: 200 }
+  ],
+  topups: [
+    { code: "topup_100", credits: 100, amountSubunits: 1000, pricePerCreditSubunits: 10, currency: "USD" },
+    { code: "topup_250", credits: 250, amountSubunits: 2300, pricePerCreditSubunits: 9, currency: "USD" },
+    { code: "topup_500", credits: 500, amountSubunits: 4500, pricePerCreditSubunits: 9, currency: "USD" },
+    { code: "topup_1000", credits: 1000, amountSubunits: 8500, pricePerCreditSubunits: 9, currency: "USD" },
+    { code: "topup_10000", credits: 10000, amountSubunits: 90000, pricePerCreditSubunits: 9, currency: "USD" },
+    { code: "topup_50000", credits: 50000, amountSubunits: 400000, pricePerCreditSubunits: 8, currency: "USD" },
+    { code: "topup_100000", credits: 100000, amountSubunits: 450000, pricePerCreditSubunits: 5, currency: "USD" },
+    { code: "topup_200000", credits: 200000, amountSubunits: 490000, pricePerCreditSubunits: 2, currency: "USD" }
   ]
 };
 

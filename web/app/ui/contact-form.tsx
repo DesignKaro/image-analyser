@@ -87,7 +87,7 @@ export function ContactForm() {
       )}
       {status === "error" && (
         <p className="contact-form-message contact-form-error" role="alert">
-          Something went wrong. Please try again or email us at abhi@argro.co.
+          Something went wrong. Please try again or email us at imagetopromptgenerate@gmail.com.
         </p>
       )}
       <button type="submit" className="contact-form-submit" disabled={status === "sending"}>

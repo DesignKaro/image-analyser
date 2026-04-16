@@ -42,7 +42,7 @@ const sections: LegalSection[] = [
   {
     title: "Request support",
     paragraphs: [
-      "If you encounter an accessibility barrier, email abhi@argro.co with details of the page, action, and device or assistive setup used."
+      "If you encounter an accessibility barrier, email imagetopromptgenerate@gmail.com with details of the page, action, and device or assistive setup used."
     ]
   }
 ];

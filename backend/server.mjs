@@ -10,6 +10,7 @@ import {
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import { promises as dnsPromises } from "node:dns";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import mysql from "mysql2/promise";
@@ -53,20 +54,31 @@ const APP_BASE_URL = (process.env.APP_BASE_URL || "").trim();
 const RAZORPAY_API_BASE = (process.env.RAZORPAY_API_BASE || "https://api.razorpay.com/v1").replace(/\/+$/, "");
 const _rzpKeyFromEnv = (process.env.RAZORPAY_KEY_ID || "").trim();
 const _rzpSecretFromEnv = (process.env.RAZORPAY_KEY_SECRET || "").trim();
-// Use live keys so checkout does not show "Test Mode". If env has test key, override to live.
 const RAZORPAY_LIVE_KEY_ID = "rzp_live_SLIbMG7nGjimsH";
 const RAZORPAY_LIVE_KEY_SECRET = "Mhao0XfOxZUyFP3uGMih9fi7";
-const RAZORPAY_KEY_ID =
-  _rzpKeyFromEnv.startsWith("rzp_test_") ? RAZORPAY_LIVE_KEY_ID : (_rzpKeyFromEnv || RAZORPAY_LIVE_KEY_ID);
-const RAZORPAY_KEY_SECRET =
-  _rzpKeyFromEnv.startsWith("rzp_test_") ? RAZORPAY_LIVE_KEY_SECRET : (_rzpSecretFromEnv || RAZORPAY_LIVE_KEY_SECRET);
+const RAZORPAY_KEY_ID = _rzpKeyFromEnv || RAZORPAY_LIVE_KEY_ID;
+const RAZORPAY_KEY_SECRET = _rzpSecretFromEnv || RAZORPAY_LIVE_KEY_SECRET;
 const RAZORPAY_WEBHOOK_SECRET = (process.env.RAZORPAY_WEBHOOK_SECRET || "").trim();
 const RAZORPAY_CURRENCY = (process.env.RAZORPAY_CURRENCY || "USD").trim().toUpperCase();
 const DEFAULT_PRICING_CURRENCY = (process.env.DEFAULT_PRICING_CURRENCY || RAZORPAY_CURRENCY || "USD")
   .trim()
   .toUpperCase();
 const USD_TO_INR_RATE = Number(process.env.USD_TO_INR_RATE || 83);
-const RAZORPAY_PRO_AMOUNT_SUBUNITS = Number(process.env.RAZORPAY_PRO_AMOUNT_SUBUNITS || 2000);
+const MODEL_COST_USD_CENTS_PER_PROMPT = Number(process.env.MODEL_COST_USD_CENTS_PER_PROMPT || 2);
+const PROMPT_PRICE_MULTIPLIER = Number(process.env.PROMPT_PRICE_MULTIPLIER || 5);
+const DEFAULT_PROMPT_SELL_PRICE_USD_CENTS = Number.isFinite(MODEL_COST_USD_CENTS_PER_PROMPT) &&
+  MODEL_COST_USD_CENTS_PER_PROMPT > 0 &&
+  Number.isFinite(PROMPT_PRICE_MULTIPLIER) &&
+  PROMPT_PRICE_MULTIPLIER > 0
+  ? Math.max(1, Math.round(MODEL_COST_USD_CENTS_PER_PROMPT * PROMPT_PRICE_MULTIPLIER))
+  : 10;
+const FREE_MONTHLY_PROMPT_QUOTA = Number(process.env.FREE_MONTHLY_PROMPT_QUOTA || 20);
+const PRO_MONTHLY_PROMPT_QUOTA = Number(process.env.PRO_MONTHLY_PROMPT_QUOTA || 200);
+const RAZORPAY_PRO_AMOUNT_SUBUNITS = Number(
+  process.env.RAZORPAY_PRO_AMOUNT_SUBUNITS ||
+    Math.round((Number.isFinite(PRO_MONTHLY_PROMPT_QUOTA) && PRO_MONTHLY_PROMPT_QUOTA > 0 ? PRO_MONTHLY_PROMPT_QUOTA : 200) * DEFAULT_PROMPT_SELL_PRICE_USD_CENTS)
+);
+// Keep legacy unlimited config for backward-compatibility with existing accounts.
 const RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS = Number(process.env.RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS || 6000);
 const RAZORPAY_PRO_ANNUAL_AMOUNT_SUBUNITS = Number(
   process.env.RAZORPAY_PRO_ANNUAL_AMOUNT_SUBUNITS ||
@@ -76,7 +88,19 @@ const RAZORPAY_UNLIMITED_ANNUAL_AMOUNT_SUBUNITS = Number(
   process.env.RAZORPAY_UNLIMITED_ANNUAL_AMOUNT_SUBUNITS ||
     Math.round((RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS > 0 ? RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS : 6000) * 12 * 0.8)
 );
-const BOOTSTRAP_ADMIN_EMAILS = (process.env.BOOTSTRAP_ADMIN_EMAILS || "argro.official@gmail.com").trim();
+const TOPUP_PACK_DEFS = [
+  { code: "topup_100", credits: 100, discountPercent: 0 },
+  { code: "topup_250", credits: 250, discountPercent: 8 },
+  { code: "topup_500", credits: 500, discountPercent: 10 },
+  { code: "topup_1000", credits: 1000, discountPercent: 15 },
+  { code: "topup_10000", credits: 10000, discountPercent: 10 },
+  { code: "topup_50000", credits: 50000, discountPercent: 20 },
+  // Cap large packs under common Razorpay transaction ceilings.
+  { code: "topup_100000", credits: 100000, discountPercent: 30, maxUsdAmountSubunits: 450000 },
+  { code: "topup_200000", credits: 200000, discountPercent: 35, maxUsdAmountSubunits: 490000 }
+];
+const TOPUP_PACKS_USD = buildTopupPackCatalogUsd();
+const BOOTSTRAP_ADMIN_EMAILS = (process.env.BOOTSTRAP_ADMIN_EMAILS || "imagetopromptgenerate@gmail.com").trim();
 const BOOTSTRAP_ADMIN_PASSWORD = (process.env.BOOTSTRAP_ADMIN_PASSWORD || "").trim();
 
 const STRIPE_API_BASE = (process.env.STRIPE_API_BASE || "https://api.stripe.com/v1").replace(/\/+$/, "");
@@ -92,14 +116,23 @@ const PLAN_CONFIG = {
   free: {
     code: "free",
     name: "Free",
-    monthlyQuota: 20,
+    monthlyQuota:
+      Number.isFinite(FREE_MONTHLY_PROMPT_QUOTA) && FREE_MONTHLY_PROMPT_QUOTA > 0
+        ? Math.round(FREE_MONTHLY_PROMPT_QUOTA)
+        : 20,
     priceUsdCents: 0
   },
   pro: {
     code: "pro",
     name: "Pro",
-    monthlyQuota: 200,
-    priceUsdCents: 2000
+    monthlyQuota:
+      Number.isFinite(PRO_MONTHLY_PROMPT_QUOTA) && PRO_MONTHLY_PROMPT_QUOTA > 0
+        ? Math.round(PRO_MONTHLY_PROMPT_QUOTA)
+        : 200,
+    priceUsdCents:
+      Number.isFinite(RAZORPAY_PRO_AMOUNT_SUBUNITS) && RAZORPAY_PRO_AMOUNT_SUBUNITS > 0
+        ? Math.round(RAZORPAY_PRO_AMOUNT_SUBUNITS)
+        : 2000
   },
   unlimited: {
     code: "unlimited",
@@ -117,6 +150,96 @@ const PLAN_CONFIG = {
 
 const USER_PLAN_CODES = ["free", "pro", "unlimited"];
 const USER_ROLES = ["subscriber", "admin", "superadmin"];
+const BLOCK_DISPOSABLE_EMAILS = parseBoolean(process.env.BLOCK_DISPOSABLE_EMAILS, true);
+const SIGNUP_MIN_FORM_FILL_MS = Number(process.env.SIGNUP_MIN_FORM_FILL_MS || 1500);
+const SIGNUP_MAX_FORM_AGE_MS = Number(process.env.SIGNUP_MAX_FORM_AGE_MS || 1000 * 60 * 60 * 12);
+const AUTH_RATE_LIMIT_WINDOW_MS = Number(process.env.AUTH_RATE_LIMIT_WINDOW_MS || 10 * 60 * 1000);
+const AUTH_SIGNUP_MAX_ATTEMPTS_PER_IP = Number(process.env.AUTH_SIGNUP_MAX_ATTEMPTS_PER_IP || 8);
+const AUTH_SIGNUP_MAX_ATTEMPTS_PER_EMAIL = Number(process.env.AUTH_SIGNUP_MAX_ATTEMPTS_PER_EMAIL || 4);
+const AUTH_SIGNUP_MAX_REGISTRATIONS_PER_IP = Number(process.env.AUTH_SIGNUP_MAX_REGISTRATIONS_PER_IP || 6);
+const AUTH_SIGNIN_MAX_ATTEMPTS_PER_IP = Number(process.env.AUTH_SIGNIN_MAX_ATTEMPTS_PER_IP || 30);
+const AUTH_SIGNIN_MAX_ATTEMPTS_PER_EMAIL = Number(process.env.AUTH_SIGNIN_MAX_ATTEMPTS_PER_EMAIL || 12);
+const AUTH_GOOGLE_MAX_ATTEMPTS_PER_IP = Number(process.env.AUTH_GOOGLE_MAX_ATTEMPTS_PER_IP || 25);
+const AUTH_GOOGLE_MAX_ATTEMPTS_PER_EMAIL = Number(process.env.AUTH_GOOGLE_MAX_ATTEMPTS_PER_EMAIL || 10);
+const AUTH_ENFORCE_EMAIL_DNS = parseBoolean(process.env.AUTH_ENFORCE_EMAIL_DNS, true);
+const AUTH_EMAIL_DNS_FAIL_OPEN = parseBoolean(process.env.AUTH_EMAIL_DNS_FAIL_OPEN, false);
+const AUTH_EMAIL_DNS_TIMEOUT_MS = Number(process.env.AUTH_EMAIL_DNS_TIMEOUT_MS || 3000);
+const AUTH_EMAIL_DNS_CACHE_SUCCESS_MS = Number(process.env.AUTH_EMAIL_DNS_CACHE_SUCCESS_MS || 6 * 60 * 60 * 1000);
+const AUTH_EMAIL_DNS_CACHE_FAILURE_MS = Number(process.env.AUTH_EMAIL_DNS_CACHE_FAILURE_MS || 20 * 60 * 1000);
+const AUTH_RATE_BUCKETS = new Map();
+const EMAIL_DOMAIN_CHECK_CACHE = new Map();
+const DISPOSABLE_EMAIL_DOMAIN_BLOCKLIST = new Set([
+  "10minutemail.com",
+  "10minutemail.net",
+  "20minutemail.com",
+  "dispostable.com",
+  "discard.email",
+  "emailondeck.com",
+  "fakeinbox.com",
+  "getnada.com",
+  "getairmail.com",
+  "guerrillamail.com",
+  "guerrillamail.net",
+  "guerrillamail.org",
+  "inboxkitten.com",
+  "maildrop.cc",
+  "mailinator.com",
+  "mailnesia.com",
+  "mintemail.com",
+  "moakt.com",
+  "my10minutemail.com",
+  "mytrashmail.com",
+  "sharklasers.com",
+  "spamgourmet.com",
+  "temp-mail.org",
+  "temp-mail.io",
+  "tempmail.com",
+  "tempail.com",
+  "tempmailo.com",
+  "temporary-mail.net",
+  "throwawaymail.com",
+  "trashmail.com",
+  "trashmail.de",
+  "trashmail.net",
+  "yopmail.com",
+  "yopmail.net",
+  "yopmail.fr"
+]);
+const DISPOSABLE_EMAIL_DOMAIN_HINTS = [
+  "10minutemail",
+  "disposable",
+  "guerrillamail",
+  "mailinator",
+  "maildrop",
+  "temp-mail",
+  "tempmail",
+  "throwaway",
+  "trashmail",
+  "yopmail",
+  "sharklasers",
+  "fakeinbox",
+  "getnada"
+];
+const DISPOSABLE_EMAIL_MX_HINTS = [
+  "10minutemail",
+  "dispostable",
+  "dropmail",
+  "fakemail",
+  "guerrillamail",
+  "maildrop",
+  "mailinator",
+  "mailnesia",
+  "mailpoof",
+  "moakt",
+  "temp-mail",
+  "tempmail",
+  "throwaway",
+  "trashmail",
+  "yopmail",
+  "sharklasers",
+  "spamgourmet",
+  "inboxkitten"
+];
 const SCHEMA_SQL = loadSchemaSql();
 
 bootstrap().catch((error) => {
@@ -255,6 +378,11 @@ async function bootstrap() {
         return;
       }
 
+      if (req.method === "POST" && pathname === "/api/billing/topup/checkout-session") {
+        await handleCreateTopupCheckoutSession(req, res);
+        return;
+      }
+
       if (req.method === "POST" && pathname === "/api/billing/portal-session") {
         await handleCreateBillingPortalSession(req, res);
         return;
@@ -267,6 +395,11 @@ async function bootstrap() {
 
       if (req.method === "POST" && pathname === "/api/billing/verify-payment") {
         await handleVerifyRazorpayPayment(req, res);
+        return;
+      }
+
+      if (req.method === "POST" && pathname === "/api/billing/topup/verify-payment") {
+        await handleVerifyTopupPayment(req, res);
         return;
       }
 
@@ -360,10 +493,18 @@ async function handleSignup(req, res) {
   const body = await readJsonBody(req, MAX_BODY_BYTES);
   const email = normalizeEmail(body?.email);
   const password = typeof body?.password === "string" ? body.password : "";
+  assertAuthRateLimit(req, "signup", email, {
+    maxPerIp: AUTH_SIGNUP_MAX_ATTEMPTS_PER_IP,
+    maxPerEmail: AUTH_SIGNUP_MAX_ATTEMPTS_PER_EMAIL,
+    message: "Too many sign-up attempts. Please wait a few minutes and try again."
+  });
+  assertSignupBotSignals(body);
 
   if (!email) {
     throw new HttpError(400, "Valid email is required.");
   }
+
+  await assertAllowedRegistrationEmail(email);
 
   if (!isStrongPassword(password)) {
     throw new HttpError(400, "Password must be at least 8 characters.");
@@ -373,7 +514,7 @@ async function handleSignup(req, res) {
 
   let userId;
   try {
-    userId = await insertUser({ email, passwordHash });
+    userId = await insertUserWithIpRegistrationLimit(req, { email, passwordHash });
   } catch (error) {
     const message = toUserError(error);
     if (/duplicate entry/i.test(message)) {
@@ -408,6 +549,12 @@ async function handleSignin(req, res) {
   if (!email || !password) {
     throw new HttpError(400, "Email and password are required.");
   }
+
+  assertAuthRateLimit(req, "signin", email, {
+    maxPerIp: AUTH_SIGNIN_MAX_ATTEMPTS_PER_IP,
+    maxPerEmail: AUTH_SIGNIN_MAX_ATTEMPTS_PER_EMAIL,
+    message: "Too many sign-in attempts. Please wait a few minutes and try again."
+  });
 
   const user = await findUserByEmail(email);
   if (!user) {
@@ -599,6 +746,12 @@ async function handleGoogleAuth(req, res) {
   const body = await readJsonBody(req, MAX_BODY_BYTES);
   const idToken = typeof body?.idToken === "string" ? body.idToken.trim() : "";
 
+  assertAuthRateLimit(req, "google", "", {
+    maxPerIp: AUTH_GOOGLE_MAX_ATTEMPTS_PER_IP,
+    maxPerEmail: 0,
+    message: "Too many Google login attempts. Please wait a few minutes and try again."
+  });
+
   if (!idToken) {
     throw new HttpError(400, "Google ID token is required.");
   }
@@ -608,13 +761,19 @@ async function handleGoogleAuth(req, res) {
   if (!email) {
     throw new HttpError(401, "Google account did not return a valid email.");
   }
+  assertAuthRateLimit(req, "google", email, {
+    maxPerIp: 0,
+    maxPerEmail: AUTH_GOOGLE_MAX_ATTEMPTS_PER_EMAIL,
+    message: "Too many Google login attempts. Please wait a few minutes and try again."
+  });
 
   let user = await findUserByEmail(email);
 
   if (!user) {
+    await assertAllowedRegistrationEmail(email);
     const generatedPassword = `google-${googleProfile.sub || randomUUID()}-${randomBytes(12).toString("hex")}`;
     const passwordHash = await hashPassword(generatedPassword);
-    const userId = await insertUser({ email, passwordHash });
+    const userId = await insertUserWithIpRegistrationLimit(req, { email, passwordHash });
     const subscription = await setUserPlan(userId, "free", null);
     const token = createAuthToken({ sub: userId, role: "subscriber", email });
     const usage = await buildUsageSummary("user", String(userId), subscription.monthlyQuota);
@@ -817,8 +976,8 @@ async function handleCreateCheckoutSession(req, res) {
   const planCode = normalizeUserPlanCode(body?.planCode);
   const billingCycle = normalizeBillingCycle(body?.billingCycle);
 
-  if (planCode !== "pro" && planCode !== "unlimited") {
-    throw new HttpError(400, "checkout supports paid plans only: pro, unlimited.");
+  if (planCode !== "pro") {
+    throw new HttpError(400, "checkout supports paid plans only: pro.");
   }
 
   const currentPlanCode = normalizeUserPlanCode(actor.subscription?.planCode) || "free";
@@ -870,6 +1029,68 @@ async function handleCreateCheckoutSession(req, res) {
     billingCycle,
     name: "Image to Prompt",
     description: `${planName} ${billingCycle} plan`,
+    prefill: {
+      email: actor.user.email
+    }
+  });
+}
+
+async function handleCreateTopupCheckoutSession(req, res) {
+  const actor = await resolveActor(req, { requireUser: true });
+  const body = await readJsonBody(req, MAX_BODY_BYTES);
+  const topupCode = typeof body?.topupCode === "string" ? body.topupCode.trim() : "";
+  const pack = getTopupPackByCode(topupCode);
+
+  if (!pack) {
+    throw new HttpError(400, "Invalid topupCode.");
+  }
+
+  ensureRazorpayConfigured();
+  const pricingContext = buildPricingContext(req);
+  const pricedPack = buildTopupCatalogForCurrency(pricingContext.currency).find((entry) => entry.code === pack.code);
+
+  if (!pricedPack || pricedPack.amountSubunits <= 0) {
+    throw new HttpError(500, "Top-up pricing is not configured correctly.");
+  }
+
+  const order = await razorpayRequest("POST", "/orders", {
+    amount: pricedPack.amountSubunits,
+    currency: pricedPack.currency,
+    receipt: `i2p_topup_${actor.user.id}_${Date.now()}`,
+    notes: {
+      user_id: String(actor.user.id),
+      user_email: actor.user.email,
+      topup_code: pack.code,
+      topup_credits: String(pack.credits)
+    }
+  });
+
+  const orderId = typeof order?.id === "string" ? order.id.trim() : "";
+  if (!orderId) {
+    throw new HttpError(502, "Razorpay order creation failed.");
+  }
+
+  await upsertCreditTopupOrderCreated({
+    orderId,
+    userId: actor.user.id,
+    topupCode: pack.code,
+    credits: pack.credits,
+    periodKey: getCurrentPeriodKey(),
+    amountSubunits: pricedPack.amountSubunits,
+    currency: pricedPack.currency
+  });
+
+  json(res, 200, {
+    ok: true,
+    provider: "razorpay",
+    keyId: RAZORPAY_KEY_ID,
+    orderId,
+    amount: pricedPack.amountSubunits,
+    currency: pricedPack.currency,
+    topupCode: pack.code,
+    credits: pack.credits,
+    name: "Image to Prompt",
+    description: `Add ${pack.credits} credits`,
     prefill: {
       email: actor.user.email
     }
@@ -961,6 +1182,91 @@ async function handleVerifyRazorpayPayment(req, res) {
   });
 }
 
+async function handleVerifyTopupPayment(req, res) {
+  const actor = await resolveActor(req, { requireUser: true });
+  ensureRazorpayConfigured();
+
+  const body = await readJsonBody(req, MAX_BODY_BYTES);
+  const orderId = typeof body?.razorpay_order_id === "string" ? body.razorpay_order_id.trim() : "";
+  const paymentId = typeof body?.razorpay_payment_id === "string" ? body.razorpay_payment_id.trim() : "";
+  const signature = typeof body?.razorpay_signature === "string" ? body.razorpay_signature.trim() : "";
+
+  if (!orderId || !paymentId || !signature) {
+    throw new HttpError(400, "Missing Razorpay payment verification fields.");
+  }
+
+  const order = await findCreditTopupOrderByOrderIdAndUser(orderId, actor.user.id);
+  if (!order) {
+    throw new HttpError(404, "Top-up order not found for this user.");
+  }
+
+  if (order.status === "paid") {
+    const subscription = await getActiveSubscription(actor.user.id);
+    const usage = await buildUsageSummary("user", String(actor.user.id), subscription?.monthlyQuota ?? PLAN_CONFIG.free.monthlyQuota);
+    json(res, 200, {
+      ok: true,
+      topup: {
+        code: order.topupCode,
+        credits: order.credits
+      },
+      subscription,
+      usage
+    });
+    return;
+  }
+
+  if (!isValidRazorpayPaymentSignature(orderId, paymentId, signature, RAZORPAY_KEY_SECRET)) {
+    await markCreditTopupOrderFailed(orderId, paymentId, signature, body);
+    throw new HttpError(400, "Invalid Razorpay signature.");
+  }
+
+  const payment = await razorpayRequest("GET", `/payments/${encodeURIComponent(paymentId)}`);
+  const paymentOrderId = typeof payment?.order_id === "string" ? payment.order_id.trim() : "";
+  const paymentStatus = typeof payment?.status === "string" ? payment.status.trim().toLowerCase() : "";
+  const paymentAmount = Number.parseInt(String(payment?.amount || 0), 10);
+  const paymentCurrency = typeof payment?.currency === "string" ? payment.currency.trim().toUpperCase() : "";
+
+  if (!paymentOrderId || paymentOrderId !== orderId) {
+    await markCreditTopupOrderFailed(orderId, paymentId, signature, payment);
+    throw new HttpError(400, "Payment does not match the top-up order.");
+  }
+
+  if (paymentStatus !== "captured" && paymentStatus !== "authorized") {
+    await markCreditTopupOrderFailed(orderId, paymentId, signature, payment);
+    throw new HttpError(400, "Payment is not captured.");
+  }
+
+  if (
+    Number.isFinite(order.amountSubunits) &&
+    order.amountSubunits > 0 &&
+    Number.isFinite(paymentAmount) &&
+    paymentAmount > 0 &&
+    paymentAmount !== order.amountSubunits
+  ) {
+    await markCreditTopupOrderFailed(orderId, paymentId, signature, payment);
+    throw new HttpError(400, "Payment amount mismatch.");
+  }
+
+  if (order.currency && paymentCurrency && paymentCurrency !== order.currency) {
+    await markCreditTopupOrderFailed(orderId, paymentId, signature, payment);
+    throw new HttpError(400, "Payment currency mismatch.");
+  }
+
+  await markCreditTopupOrderPaid(orderId, paymentId, signature, payment);
+  const subscription = await getActiveSubscription(actor.user.id);
+  const usage = await buildUsageSummary("user", String(actor.user.id), subscription?.monthlyQuota ?? PLAN_CONFIG.free.monthlyQuota);
+
+  json(res, 200, {
+    ok: true,
+    topup: {
+      code: order.topupCode,
+      credits: order.credits
+    },
+    subscription,
+    usage
+  });
+}
+
 async function handleCreateBillingPortalSession(req, res) {
   await resolveActor(req, { requireUser: true });
 
@@ -976,33 +1282,7 @@ async function handleCreateBillingPortalSession(req, res) {
 
 async function handleListBillingOrders(req, res) {
   const actor = await resolveActor(req, { requireUser: true });
-
-  const rows = await queryJson(`
-    SELECT JSON_OBJECT(
-      'id', id,
-      'planCode', plan_code,
-      'billingCycle', billing_cycle,
-      'amountSubunits', amount_subunits,
-      'currency', currency,
-      'status', status,
-      'createdAt', DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ')
-    )
-    FROM billing_orders
-    WHERE user_id = ${sqlNumber(actor.user.id)}
-    ORDER BY created_at DESC
-    LIMIT 100
-  `);
-
-  const orders = (Array.isArray(rows) ? rows : []).map((r) => ({
-    id: r?.id,
-    planCode: normalizeUserPlanCode(r?.planCode),
-    billingCycle: normalizeBillingCycle(r?.billingCycle),
-    amountSubunits: Number.parseInt(String(r?.amountSubunits || 0), 10) || 0,
-    currency: typeof r?.currency === "string" ? r.currency.trim().toUpperCase() : "",
-    status: typeof r?.status === "string" ? r.status.trim().toLowerCase() : "",
-    createdAt: typeof r?.createdAt === "string" ? r.createdAt : null
-  }));
-
+  const orders = await listBillingOrdersByUserId(actor.user.id, 100);
   json(res, 200, { ok: true, orders });
 }
 
@@ -1282,16 +1562,62 @@ async function handleAdminSetRole(req, res, targetUserId) {
   });
 }
 
+const PROMPT_FORMAT_PROMPTS = {
+  "structured": `You are an expert image prompt engineer. Analyze the image and output a structured prompt with clearly labeled fields. Use this exact format:
+
+Subject: [main subject description]
+Style: [visual style, art direction]
+Lighting: [lighting type and direction]
+Composition: [framing, angle, depth of field]
+Color Palette: [dominant colors and mood]
+Mood: [emotional tone and atmosphere]
+Additional Details: [textures, materials, background, any other specifics]
+
+Output only these labeled fields. No preamble, no markdown, no extra text.`,
+
+  "graphic-design": `You are a senior graphic designer and art director. Analyze this image and write a creative brief / prompt optimized for graphic design and visual content creation. Include:
+
+- Design style and visual direction
+- Typography cues (if any)
+- Color scheme and palette
+- Layout and composition notes
+- Brand or campaign feel
+- Target medium (social, print, web, etc. if inferable)
+
+Write as a single cohesive design brief paragraph. No bullet lists. No labels. Output only the brief text.`,
+
+  "json": `You are an expert image analyst. Analyze the image and return a structured JSON object with the following keys:
+{
+  "subject": "main subject of the image",
+  "style": "visual style and art direction",
+  "lighting": "lighting description",
+  "composition": "framing and composition",
+  "colorPalette": ["color1", "color2", "..."],
+  "mood": "emotional tone",
+  "background": "background description",
+  "additionalDetails": "any other notable details"
+}
+Output only valid JSON. No markdown, no code fences, no extra text.`
+};
+
+const DESCRIBE_LANGUAGES = {
+  hi: "Hindi",
+  es: "Spanish",
+  fr: "French",
+  de: "German",
+  ja: "Japanese"
+};
+
 async function handleDescribeImage(req, res) {
   const actor = await resolveActor(req, { requireUser: AUTH_REQUIRED });
 
   const body = await readJsonBody(req, MAX_BODY_BYTES);
   const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim() : DEFAULT_MODEL;
   const normalizedAltText = sanitizePromptContext(body?.altText);
-  const promptConfig = buildPromptConfig({
-    rawPrompt: body?.prompt,
-    altText: normalizedAltText
-  });
+  const promptFormat = typeof body?.promptFormat === "string" ? body.promptFormat.trim().toLowerCase() : null;
+  const targetLangCode = typeof body?.targetLanguage === "string" ? body.targetLanguage.trim().toLowerCase() : null;
+  const targetLanguageName = targetLangCode ? DESCRIBE_LANGUAGES[targetLangCode] : null;
+
   const imageInput = resolveImageInput(body?.imageDataUrl, body?.imageUrl);
   const apiKey = getOpenAiApiKey();
 
@@ -1299,43 +1625,67 @@ async function handleDescribeImage(req, res) {
   const usageBefore = await buildUsageSummary(actor.subjectType, actor.subjectKey, plan.monthlyQuota);
 
   if (usageBefore.limit !== null && usageBefore.used >= usageBefore.limit) {
-    throw new HttpError(402, "Monthly usage limit reached. Upgrade your plan to continue.");
+    throw new HttpError(402, "Monthly usage limit reached. Upgrade plan or add top-up credits to continue.");
   }
 
-  const rawDescription = await analyzeImage({
-    apiKey,
-    model,
-    prompt: promptConfig.prompt,
-    imageInput
-  });
-  let description = normalizePromptOutput(rawDescription) || rawDescription;
+  let description;
+  let responseTemplate = { id: "default", name: "Default" };
 
-  if (!isPromptQualityAcceptable(description)) {
-    const retryPrompt = buildQualityRetryPrompt({
-      candidatePrompt: description,
-      template: promptConfig.template,
-      altText: normalizedAltText
+  if (promptFormat && PROMPT_FORMAT_PROMPTS[promptFormat]) {
+    // Format prompt: single focused call in chosen format + language
+    responseTemplate = { id: promptFormat, name: promptFormat.charAt(0).toUpperCase() + promptFormat.slice(1) };
+    let formatPrompt = PROMPT_FORMAT_PROMPTS[promptFormat];
+    if (targetLanguageName) {
+      formatPrompt += `\n\nIMPORTANT: Write the entire output in ${targetLanguageName}. Do not use English.`;
+    }
+    const rawDescription = await analyzeImage({ apiKey, model, prompt: formatPrompt, imageInput });
+    description = rawDescription.trim();
+  } else {
+    // Standard flow with optional language override
+    const promptConfig = buildPromptConfig({
+      rawPrompt: body?.prompt,
+      altText: normalizedAltText,
+      targetLanguageName
     });
-    const retryRawDescription = await analyzeImage({
+    responseTemplate = promptConfig.template;
+
+    const rawDescription = await analyzeImage({
       apiKey,
       model,
-      prompt: retryPrompt,
+      prompt: promptConfig.prompt,
       imageInput
     });
-    const retryDescription = normalizePromptOutput(retryRawDescription) || retryRawDescription;
-    description = pickHigherQualityPrompt(description, retryDescription);
+    description = targetLanguageName
+      ? (rawDescription.trim() || rawDescription)
+      : (normalizePromptOutput(rawDescription) || rawDescription);
+
+    if (!targetLanguageName && !isPromptQualityAcceptable(description)) {
+      const retryPrompt = buildQualityRetryPrompt({
+        candidatePrompt: description,
+        template: promptConfig.template,
+        altText: normalizedAltText
+      });
+      const retryRawDescription = await analyzeImage({
+        apiKey,
+        model,
+        prompt: retryPrompt,
+        imageInput
+      });
+      const retryDescription = normalizePromptOutput(retryRawDescription) || retryRawDescription;
+      description = pickHigherQualityPrompt(description, retryDescription);
+    }
   }
 
   const requestId = randomUUID();
   const consumed = await consumeUsage({
     subjectType: actor.subjectType,
     subjectKey: actor.subjectKey,
-    limit: plan.monthlyQuota,
+    limit: usageBefore.limit,
     planCode: plan.planCode,
     requestId
   });
   if (!consumed) {
-    throw new HttpError(402, "Monthly usage limit reached. Upgrade your plan to continue.");
+    throw new HttpError(402, "Monthly usage limit reached. Upgrade plan or add top-up credits to continue.");
   }
 
   const usageAfter = await buildUsageSummary(actor.subjectType, actor.subjectKey, plan.monthlyQuota);
@@ -1344,7 +1694,7 @@ async function handleDescribeImage(req, res) {
     ok: true,
     model,
     description,
-    template: promptConfig.template,
+    template: responseTemplate,
     requestId,
     role: actor.user?.role || "guest",
     plan: {
@@ -1388,7 +1738,7 @@ async function handleTranslatePrompt(req, res) {
   const usageBefore = await buildUsageSummary(actor.subjectType, actor.subjectKey, plan.monthlyQuota);
 
   if (usageBefore.limit !== null && usageBefore.used >= usageBefore.limit) {
-    throw new HttpError(402, "Monthly usage limit reached. Upgrade your plan to continue.");
+    throw new HttpError(402, "Monthly usage limit reached. Upgrade plan or add top-up credits to continue.");
   }
 
   const translatePrompt = `The user has provided an image and its description in English below. Rewrite the description entirely in ${languageName}. Keep the same structure, detail level, and image-generation focus. Output only the translated prompt text. No wrappers, labels, or markdown.
@@ -1408,12 +1758,12 @@ ${description}`;
   const consumed = await consumeUsage({
     subjectType: actor.subjectType,
     subjectKey: actor.subjectKey,
-    limit: plan.monthlyQuota,
+    limit: usageBefore.limit,
     planCode: plan.planCode,
     requestId
   });
   if (!consumed) {
-    throw new HttpError(402, "Monthly usage limit reached. Upgrade your plan to continue.");
+    throw new HttpError(402, "Monthly usage limit reached. Upgrade plan or add top-up credits to continue.");
   }
 
   const usageAfter = await buildUsageSummary(actor.subjectType, actor.subjectKey, plan.monthlyQuota);
@@ -1480,13 +1830,45 @@ async function resolveActor(req, options = {}) {
 async function buildUsageSummary(subjectType, subjectKey, monthlyQuota) {
   const periodKey = getCurrentPeriodKey();
   const used = await getUsageCount(subjectType, subjectKey, periodKey);
+  let limit = monthlyQuota;
+
+  if (subjectType === "user" && limit !== null) {
+    const userId = Number.parseInt(String(subjectKey || ""), 10);
+    if (Number.isFinite(userId) && userId > 0) {
+      const topupCredits = await getUserTopupCreditsForPeriod(userId, periodKey);
+      limit = Math.max(0, Math.round(limit) + topupCredits);
+    }
+  }
 
   return {
     periodKey,
     used,
-    limit: monthlyQuota,
-    remaining: monthlyQuota === null ? null : Math.max(0, monthlyQuota - used)
+    limit,
+    remaining: limit === null ? null : Math.max(0, limit - used)
   };
+}
+
+async function getUserTopupCreditsForPeriod(userId, periodKey) {
+  if (!Number.isFinite(userId) || userId <= 0 || !periodKey) {
+    return 0;
+  }
+
+  const row = await queryOneJson(`
+    SELECT JSON_OBJECT(
+      'credits', COALESCE(SUM(credits), 0)
+    )
+    FROM credit_topup_orders
+    WHERE user_id = ${sqlNumber(userId)}
+      AND period_key = ${sqlString(periodKey)}
+      AND status = 'paid'
+  `);
+
+  const credits = Number.parseInt(String(row?.credits || 0), 10);
+  if (!Number.isFinite(credits) || credits <= 0) {
+    return 0;
+  }
+
+  return credits;
 }
 
 async function insertUser({ email, passwordHash }) {
@@ -1504,6 +1886,105 @@ async function insertUser({ email, passwordHash }) {
   `;
 
   return executeInsertAndReadId(insertSql);
+}
+
+async function insertUserWithIpRegistrationLimit(req, { email, passwordHash }) {
+  const maxRegistrationsPerIp = Number.isFinite(AUTH_SIGNUP_MAX_REGISTRATIONS_PER_IP)
+    ? Math.max(0, Math.round(AUTH_SIGNUP_MAX_REGISTRATIONS_PER_IP))
+    : 6;
+  if (maxRegistrationsPerIp <= 0) {
+    return insertUser({ email, passwordHash });
+  }
+
+  const ipHash = hashSignupIp(getClientIp(req));
+  if (!ipHash) {
+    return insertUser({ email, passwordHash });
+  }
+
+  const connection = await mysqlPool.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [counterRows] = await connection.query(`
+      SELECT successful_registrations AS successfulRegistrations
+      FROM signup_ip_registrations
+      WHERE ip_hash = ${sqlString(ipHash)}
+      FOR UPDATE
+    `);
+    const currentCountRaw = Array.isArray(counterRows) && counterRows[0]
+      ? counterRows[0].successfulRegistrations
+      : 0;
+    const currentCount = Number.parseInt(String(currentCountRaw || 0), 10) || 0;
+    if (currentCount >= maxRegistrationsPerIp) {
+      throw new HttpError(
+        429,
+        `Registration limit reached for this IP address. Maximum ${maxRegistrationsPerIp} accounts are allowed.`
+      );
+    }
+
+    const insertSql = `
+      INSERT INTO users (email, password_hash, role, status, plan_code, created_at, updated_at)
+      VALUES (
+        ${sqlString(email)},
+        ${sqlString(passwordHash)},
+        'subscriber',
+        'active',
+        'free',
+        UTC_TIMESTAMP(),
+        UTC_TIMESTAMP()
+      )
+    `;
+    const [insertResult] = await connection.query(insertSql);
+    let userId = Number.parseInt(String(insertResult?.insertId ?? ""), 10);
+
+    if (!Number.isFinite(userId) || userId <= 0) {
+      const [rows] = await connection.query("SELECT LAST_INSERT_ID() AS id");
+      const fallbackId = Number.parseInt(String(Array.isArray(rows) && rows[0] ? rows[0].id : ""), 10);
+      if (!Number.isFinite(fallbackId) || fallbackId <= 0) {
+        throw new HttpError(500, "Database insert did not return an id.");
+      }
+      userId = fallbackId;
+    }
+
+    await connection.query(`
+      INSERT INTO signup_ip_registrations (
+        ip_hash,
+        successful_registrations,
+        first_registered_at,
+        last_registered_at,
+        created_at,
+        updated_at
+      ) VALUES (
+        ${sqlString(ipHash)},
+        1,
+        UTC_TIMESTAMP(),
+        UTC_TIMESTAMP(),
+        UTC_TIMESTAMP(),
+        UTC_TIMESTAMP()
+      )
+      ON DUPLICATE KEY UPDATE
+        successful_registrations = successful_registrations + 1,
+        last_registered_at = UTC_TIMESTAMP(),
+        updated_at = UTC_TIMESTAMP()
+    `);
+
+    await connection.commit();
+    return userId;
+  } catch (error) {
+    try {
+      await connection.rollback();
+    } catch {
+      // Ignore rollback failures; original error is more relevant.
+    }
+
+    if (error instanceof HttpError) {
+      throw error;
+    }
+    const message = error?.message || "Database insert failed.";
+    throw new HttpError(500, message);
+  } finally {
+    connection.release();
+  }
 }
 
 async function setUserPlan(userId, planCode, actorUserId) {
@@ -1668,9 +2149,9 @@ async function listAdminUsers() {
       'createdAt', DATE_FORMAT(u.created_at, '%Y-%m-%dT%H:%i:%sZ'),
       'usageUsed', COALESCE(uc.used_count, 0),
       'usageLimit', CASE
-        WHEN s.monthly_quota IS NOT NULL THEN s.monthly_quota
-        WHEN u.plan_code = 'free' THEN 20
-        WHEN u.plan_code = 'pro' THEN 200
+        WHEN s.monthly_quota IS NOT NULL THEN s.monthly_quota + COALESCE(tc.topup_credits, 0)
+        WHEN u.plan_code = 'free' THEN ${sqlNumber(PLAN_CONFIG.free.monthlyQuota)} + COALESCE(tc.topup_credits, 0)
+        WHEN u.plan_code = 'pro' THEN ${sqlNumber(PLAN_CONFIG.pro.monthlyQuota)} + COALESCE(tc.topup_credits, 0)
         ELSE NULL
       END,
       'subscriptionStatus', COALESCE(s.status, 'canceled'),
@@ -1681,6 +2162,14 @@ async function listAdminUsers() {
       ON uc.subject_type = 'user'
      AND uc.subject_key = CAST(u.id AS CHAR)
      AND uc.period_key = ${sqlString(periodKey)}
+    LEFT JOIN (
+      SELECT user_id, period_key, SUM(credits) AS topup_credits
+      FROM credit_topup_orders
+      WHERE status = 'paid'
+      GROUP BY user_id, period_key
+    ) tc
+      ON tc.user_id = u.id
+     AND tc.period_key = ${sqlString(periodKey)}
     LEFT JOIN subscriptions s
       ON s.id = (
         SELECT s2.id
@@ -1742,14 +2231,26 @@ async function getSuperadminOverview() {
 
   const billingRow = await queryOneJson(`
     SELECT JSON_OBJECT(
-      'monthRevenueSubunits', COALESCE(SUM(CASE WHEN status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY) THEN amount_subunits ELSE 0 END), 0),
-      'weekRevenueSubunits', COALESCE(SUM(CASE WHEN status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY) THEN amount_subunits ELSE 0 END), 0),
-      'lifetimeRevenueSubunits', COALESCE(SUM(CASE WHEN status = 'paid' THEN amount_subunits ELSE 0 END), 0),
-      'paidPayments30d', COALESCE(SUM(CASE WHEN status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY) THEN 1 ELSE 0 END), 0),
-      'failedPayments30d', COALESCE(SUM(CASE WHEN status = 'failed' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY) THEN 1 ELSE 0 END), 0),
-      'pendingPayments30d', COALESCE(SUM(CASE WHEN status = 'created' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY) THEN 1 ELSE 0 END), 0)
+      'monthRevenueSubunits',
+        COALESCE((SELECT SUM(amount_subunits) FROM billing_orders WHERE status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)), 0) +
+        COALESCE((SELECT SUM(amount_subunits) FROM credit_topup_orders WHERE status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)), 0),
+      'weekRevenueSubunits',
+        COALESCE((SELECT SUM(amount_subunits) FROM billing_orders WHERE status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)), 0) +
+        COALESCE((SELECT SUM(amount_subunits) FROM credit_topup_orders WHERE status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 7 DAY)), 0),
+      'lifetimeRevenueSubunits',
+        COALESCE((SELECT SUM(amount_subunits) FROM billing_orders WHERE status = 'paid'), 0) +
+        COALESCE((SELECT SUM(amount_subunits) FROM credit_topup_orders WHERE status = 'paid'), 0),
+      'paidPayments30d',
+        COALESCE((SELECT COUNT(*) FROM billing_orders WHERE status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)), 0) +
+        COALESCE((SELECT COUNT(*) FROM credit_topup_orders WHERE status = 'paid' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)), 0),
+      'failedPayments30d',
+        COALESCE((SELECT COUNT(*) FROM billing_orders WHERE status = 'failed' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)), 0) +
+        COALESCE((SELECT COUNT(*) FROM credit_topup_orders WHERE status = 'failed' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)), 0),
+      'pendingPayments30d',
+        COALESCE((SELECT COUNT(*) FROM billing_orders WHERE status = 'created' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)), 0) +
+        COALESCE((SELECT COUNT(*) FROM credit_topup_orders WHERE status = 'created' AND created_at >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL 30 DAY)), 0)
     )
-    FROM billing_orders
+    FROM DUAL
   `);
 
   const auditRow = await queryOneJson(`
@@ -1815,7 +2316,7 @@ async function listAdminAuditLogs(limit = 80) {
 
 async function listBillingOrdersByUserId(userId, limit = 20) {
   const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(200, Math.floor(limit))) : 20;
-  const rows = await queryJson(`
+  const planRows = await queryJson(`
     SELECT JSON_OBJECT(
       'id', id,
       'planCode', plan_code,
@@ -1831,9 +2332,33 @@ async function listBillingOrdersByUserId(userId, limit = 20) {
     LIMIT ${sqlNumber(safeLimit)}
   `);
 
-  return (Array.isArray(rows) ? rows : []).map((row) => ({
+  const topupRows = await queryJson(`
+    SELECT JSON_OBJECT(
+      'id', id,
+      'planCode', CONCAT('topup:', topup_code),
+      'billingCycle', 'monthly',
+      'amountSubunits', amount_subunits,
+      'currency', currency,
+      'status', status,
+      'createdAt', DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%sZ')
+    )
+    FROM credit_topup_orders
+    WHERE user_id = ${sqlNumber(userId)}
+    ORDER BY created_at DESC
+    LIMIT ${sqlNumber(safeLimit)}
+  `);
+
+  const rows = [...(Array.isArray(planRows) ? planRows : []), ...(Array.isArray(topupRows) ? topupRows : [])]
+    .sort((a, b) => {
+      const at = Date.parse(typeof a?.createdAt === "string" ? a.createdAt : "");
+      const bt = Date.parse(typeof b?.createdAt === "string" ? b.createdAt : "");
+      return (Number.isFinite(bt) ? bt : 0) - (Number.isFinite(at) ? at : 0);
+    })
+    .slice(0, safeLimit);
+
+  return rows.map((row) => ({
     id: Number.parseInt(String(row?.id || 0), 10) || 0,
-    planCode: normalizeUserPlanCode(row?.planCode) || "",
+    planCode: normalizeUserPlanCode(row?.planCode) || (typeof row?.planCode === "string" ? row.planCode.trim().toLowerCase() : ""),
     billingCycle: normalizeBillingCycle(row?.billingCycle),
     amountSubunits: Number.parseInt(String(row?.amountSubunits || 0), 10) || 0,
     currency: typeof row?.currency === "string" ? row.currency.trim().toUpperCase() : "",
@@ -2604,6 +3129,131 @@ async function markBillingOrderFailed(orderId, paymentId, signature, payload) {
   `);
 }
 
+async function upsertCreditTopupOrderCreated({
+  orderId,
+  userId,
+  topupCode,
+  credits,
+  periodKey,
+  amountSubunits,
+  currency
+}) {
+  if (
+    !orderId ||
+    !Number.isFinite(userId) ||
+    userId <= 0 ||
+    !topupCode ||
+    !Number.isFinite(credits) ||
+    credits <= 0 ||
+    !periodKey ||
+    !Number.isFinite(amountSubunits) ||
+    amountSubunits <= 0 ||
+    !currency
+  ) {
+    return;
+  }
+
+  await runSql(`
+    INSERT INTO credit_topup_orders (
+      razorpay_order_id,
+      user_id,
+      topup_code,
+      credits,
+      period_key,
+      amount_subunits,
+      currency,
+      status,
+      created_at,
+      updated_at
+    ) VALUES (
+      ${sqlString(orderId)},
+      ${sqlNumber(userId)},
+      ${sqlString(topupCode)},
+      ${sqlNumber(Math.round(credits))},
+      ${sqlString(periodKey)},
+      ${sqlNumber(Math.round(amountSubunits))},
+      ${sqlString(currency)},
+      'created',
+      UTC_TIMESTAMP(),
+      UTC_TIMESTAMP()
+    )
+    ON DUPLICATE KEY UPDATE
+      user_id = VALUES(user_id),
+      topup_code = VALUES(topup_code),
+      credits = VALUES(credits),
+      period_key = VALUES(period_key),
+      amount_subunits = VALUES(amount_subunits),
+      currency = VALUES(currency),
+      status = 'created',
+      razorpay_payment_id = NULL,
+      razorpay_signature = NULL,
+      payload_json = NULL,
+      updated_at = UTC_TIMESTAMP()
+  `);
+}
+
+async function findCreditTopupOrderByOrderIdAndUser(orderId, userId) {
+  if (!orderId || !Number.isFinite(userId) || userId <= 0) {
+    return null;
+  }
+
+  const row = await queryOneJson(`
+    SELECT JSON_OBJECT(
+      'id', id,
+      'topupCode', topup_code,
+      'credits', credits,
+      'periodKey', period_key,
+      'amountSubunits', amount_subunits,
+      'currency', currency,
+      'status', status
+    )
+    FROM credit_topup_orders
+    WHERE razorpay_order_id = ${sqlString(orderId)}
+      AND user_id = ${sqlNumber(userId)}
+    LIMIT 1
+  `);
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    id: Number.parseInt(String(row.id || 0), 10) || 0,
+    topupCode: typeof row.topupCode === "string" ? row.topupCode.trim().toLowerCase() : "",
+    credits: Number.parseInt(String(row.credits || 0), 10) || 0,
+    periodKey: typeof row.periodKey === "string" ? row.periodKey.trim() : "",
+    amountSubunits: Number.parseInt(String(row.amountSubunits || 0), 10) || 0,
+    currency: typeof row.currency === "string" ? row.currency.trim().toUpperCase() : "",
+    status: typeof row.status === "string" ? row.status.trim().toLowerCase() : ""
+  };
+}
+
+async function markCreditTopupOrderPaid(orderId, paymentId, signature, payload) {
+  await runSql(`
+    UPDATE credit_topup_orders
+    SET
+      status = 'paid',
+      razorpay_payment_id = ${sqlString(paymentId)},
+      razorpay_signature = ${sqlString(signature)},
+      payload_json = ${sqlString(JSON.stringify(payload || {}))},
+      updated_at = UTC_TIMESTAMP()
+    WHERE razorpay_order_id = ${sqlString(orderId)}
+  `);
+}
+
+async function markCreditTopupOrderFailed(orderId, paymentId, signature, payload) {
+  await runSql(`
+    UPDATE credit_topup_orders
+    SET
+      status = 'failed',
+      razorpay_payment_id = ${sqlString(paymentId || "")},
+      razorpay_signature = ${sqlString(signature || "")},
+      payload_json = ${sqlString(JSON.stringify(payload || {}))},
+      updated_at = UTC_TIMESTAMP()
+    WHERE razorpay_order_id = ${sqlString(orderId)}
+  `);
+}
+
 async function ensureSchema() {
   await runSql(SCHEMA_SQL);
   await ensureBillingOrdersSchema();
@@ -2829,10 +3479,14 @@ function pickRandomPromptTemplate() {
   return PROMPT_TEMPLATES[index];
 }
 
-function buildPromptConfig({ rawPrompt, altText }) {
+function buildPromptConfig({ rawPrompt, altText, targetLanguageName }) {
+  const languageSuffix = targetLanguageName
+    ? `\n\nIMPORTANT: Write the entire output prompt in ${targetLanguageName}. Do not use English in your output.`
+    : "";
+
   if (typeof rawPrompt === "string" && rawPrompt.trim()) {
     return {
-      prompt: rawPrompt.trim(),
+      prompt: rawPrompt.trim() + languageSuffix,
       template: {
         id: "custom",
         name: "Custom Prompt"
@@ -2850,13 +3504,13 @@ function buildPromptConfig({ rawPrompt, altText }) {
 
   if (!template) {
     return {
-      prompt: DEFAULT_IMAGE_PROMPT,
+      prompt: DEFAULT_IMAGE_PROMPT + languageSuffix,
       template: selectedTemplate
     };
   }
 
   return {
-    prompt: buildTemplatePrompt(template, normalizedAltText),
+    prompt: buildTemplatePrompt(template, normalizedAltText) + languageSuffix,
     template: selectedTemplate
   };
 }
@@ -3389,6 +4043,17 @@ function getGuestSubjectKey(req) {
     .slice(0, 48);
 }
 
+function hashSignupIp(ipAddress) {
+  const normalized = typeof ipAddress === "string" ? ipAddress.trim().toLowerCase() : "";
+  if (!normalized) {
+    return "";
+  }
+
+  return createHash("sha256")
+    .update(`signup-ip:${GUEST_KEY_SALT}:${normalized}`)
+    .digest("hex");
+}
+
 function getClientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
   if (typeof forwarded === "string" && forwarded.trim()) {
@@ -3411,6 +4076,317 @@ function normalizeEmail(raw) {
   const value = raw.trim().toLowerCase();
   const looksLikeEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
   return looksLikeEmail ? value : "";
+}
+
+function assertAllowedAuthEmail(email) {
+  if (!BLOCK_DISPOSABLE_EMAILS) {
+    return;
+  }
+
+  if (isDisposableEmail(email)) {
+    throw new HttpError(400, "Temporary/disposable email addresses are not allowed.");
+  }
+}
+
+async function assertAllowedRegistrationEmail(email) {
+  assertAllowedAuthEmail(email);
+
+  if (!AUTH_ENFORCE_EMAIL_DNS) {
+    return;
+  }
+
+  const domain = getEmailDomain(email);
+  if (!domain) {
+    throw new HttpError(400, "Valid email is required.");
+  }
+
+  const verdict = await verifyEmailDomainDeliverability(domain);
+  if (verdict.ok) {
+    return;
+  }
+
+  if (verdict.reason === "disposable-mx") {
+    throw new HttpError(400, "Temporary/disposable email addresses are not allowed.");
+  }
+
+  if (verdict.reason === "domain-not-deliverable") {
+    throw new HttpError(400, "Email domain cannot receive mail. Use a valid email address.");
+  }
+
+  throw new HttpError(400, "Could not verify email domain. Please use a different email.");
+}
+
+async function verifyEmailDomainDeliverability(domain) {
+  const normalized = String(domain || "").trim().toLowerCase();
+  if (!normalized) {
+    return { ok: false, reason: "domain-not-deliverable" };
+  }
+
+  const now = Date.now();
+  const cached = EMAIL_DOMAIN_CHECK_CACHE.get(normalized);
+  if (cached && Number.isFinite(cached.expiresAt) && cached.expiresAt > now) {
+    return cached.verdict;
+  }
+
+  const timeoutMs = Number.isFinite(AUTH_EMAIL_DNS_TIMEOUT_MS) && AUTH_EMAIL_DNS_TIMEOUT_MS > 250
+    ? Math.round(AUTH_EMAIL_DNS_TIMEOUT_MS)
+    : 3000;
+  const successTtlMs = Number.isFinite(AUTH_EMAIL_DNS_CACHE_SUCCESS_MS) && AUTH_EMAIL_DNS_CACHE_SUCCESS_MS > 1000
+    ? Math.round(AUTH_EMAIL_DNS_CACHE_SUCCESS_MS)
+    : 6 * 60 * 60 * 1000;
+  const failureTtlMs = Number.isFinite(AUTH_EMAIL_DNS_CACHE_FAILURE_MS) && AUTH_EMAIL_DNS_CACHE_FAILURE_MS > 1000
+    ? Math.round(AUTH_EMAIL_DNS_CACHE_FAILURE_MS)
+    : 20 * 60 * 1000;
+
+  let verdict = { ok: false, reason: "domain-not-deliverable" };
+
+  try {
+    const mxRecords = await withPromiseTimeout(dnsPromises.resolveMx(normalized), timeoutMs);
+    const mxHosts = Array.isArray(mxRecords)
+      ? mxRecords
+          .map((entry) => (typeof entry?.exchange === "string" ? entry.exchange.trim().toLowerCase() : ""))
+          .filter(Boolean)
+      : [];
+
+    if (mxHosts.some((host) => isDisposableMxHost(host))) {
+      verdict = { ok: false, reason: "disposable-mx" };
+    } else if (mxHosts.length > 0) {
+      verdict = { ok: true, reason: "mx" };
+    } else {
+      const hasAddress = await hasDnsAddressRecord(normalized, timeoutMs);
+      verdict = hasAddress
+        ? { ok: true, reason: "a-or-aaaa" }
+        : { ok: false, reason: "domain-not-deliverable" };
+    }
+  } catch (error) {
+    const code = typeof error?.code === "string" ? error.code.trim().toUpperCase() : "";
+    const isNoData = code === "ENODATA" || code === "ENOTFOUND" || code === "NXDOMAIN";
+    if (isNoData) {
+      const hasAddress = await hasDnsAddressRecord(normalized, timeoutMs);
+      verdict = hasAddress
+        ? { ok: true, reason: "a-or-aaaa" }
+        : { ok: false, reason: "domain-not-deliverable" };
+    } else if (AUTH_EMAIL_DNS_FAIL_OPEN) {
+      verdict = { ok: true, reason: "dns-fail-open" };
+    } else {
+      verdict = { ok: false, reason: "dns-check-failed" };
+    }
+  }
+
+  EMAIL_DOMAIN_CHECK_CACHE.set(normalized, {
+    verdict,
+    expiresAt: now + (verdict.ok ? successTtlMs : failureTtlMs)
+  });
+  pruneEmailDomainCheckCache(now);
+  return verdict;
+}
+
+async function hasDnsAddressRecord(domain, timeoutMs) {
+  try {
+    const records4 = await withPromiseTimeout(dnsPromises.resolve4(domain), timeoutMs);
+    if (Array.isArray(records4) && records4.length > 0) {
+      return true;
+    }
+  } catch {
+    // Try AAAA before rejecting the domain.
+  }
+
+  try {
+    const records6 = await withPromiseTimeout(dnsPromises.resolve6(domain), timeoutMs);
+    return Array.isArray(records6) && records6.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function isDisposableMxHost(host) {
+  const normalized = String(host || "").trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  for (const hint of DISPOSABLE_EMAIL_MX_HINTS) {
+    if (normalized.includes(hint)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function withPromiseTimeout(promise, timeoutMs) {
+  const ms = Number.isFinite(timeoutMs) && timeoutMs > 0 ? Math.round(timeoutMs) : 3000;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      const timeoutError = new Error("DNS lookup timed out.");
+      timeoutError.code = "ETIMEOUT";
+      reject(timeoutError);
+    }, ms);
+
+    Promise.resolve(promise)
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+function pruneEmailDomainCheckCache(now = Date.now()) {
+  if (EMAIL_DOMAIN_CHECK_CACHE.size < 300) {
+    return;
+  }
+
+  for (const [key, entry] of EMAIL_DOMAIN_CHECK_CACHE.entries()) {
+    if (!entry || !Number.isFinite(entry.expiresAt) || entry.expiresAt <= now) {
+      EMAIL_DOMAIN_CHECK_CACHE.delete(key);
+    }
+  }
+
+  if (EMAIL_DOMAIN_CHECK_CACHE.size <= 4000) {
+    return;
+  }
+
+  const overflow = EMAIL_DOMAIN_CHECK_CACHE.size - 4000;
+  let removed = 0;
+  for (const key of EMAIL_DOMAIN_CHECK_CACHE.keys()) {
+    EMAIL_DOMAIN_CHECK_CACHE.delete(key);
+    removed += 1;
+    if (removed >= overflow) {
+      break;
+    }
+  }
+}
+
+function isDisposableEmail(email) {
+  const domain = getEmailDomain(email);
+  if (!domain) {
+    return false;
+  }
+
+  for (const blocked of DISPOSABLE_EMAIL_DOMAIN_BLOCKLIST) {
+    if (domain === blocked || domain.endsWith(`.${blocked}`)) {
+      return true;
+    }
+  }
+
+  for (const hint of DISPOSABLE_EMAIL_DOMAIN_HINTS) {
+    if (domain.includes(hint)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function getEmailDomain(email) {
+  if (typeof email !== "string") {
+    return "";
+  }
+
+  const atIndex = email.lastIndexOf("@");
+  if (atIndex <= 0 || atIndex >= email.length - 1) {
+    return "";
+  }
+
+  return email.slice(atIndex + 1).trim().toLowerCase();
+}
+
+function assertSignupBotSignals(body) {
+  const honeypot = typeof body?.companyWebsite === "string" ? body.companyWebsite.trim() : "";
+  const startedAtMs = Number(body?.signupStartedAtMs);
+  const minFillMs = Number.isFinite(SIGNUP_MIN_FORM_FILL_MS) && SIGNUP_MIN_FORM_FILL_MS > 0
+    ? Math.round(SIGNUP_MIN_FORM_FILL_MS)
+    : 1500;
+  const maxAgeMs = Number.isFinite(SIGNUP_MAX_FORM_AGE_MS) && SIGNUP_MAX_FORM_AGE_MS > minFillMs
+    ? Math.round(SIGNUP_MAX_FORM_AGE_MS)
+    : 1000 * 60 * 60 * 12;
+  const hasStartedAtMs = Number.isFinite(startedAtMs) && startedAtMs > 0;
+
+  // Keep compatibility with clients that do not send signupStartedAtMs.
+  // If honeypot is filled without timing metadata, treat it as suspicious.
+  if (!hasStartedAtMs) {
+    if (honeypot) {
+      throw new HttpError(400, "Sign up verification failed. Please try again.");
+    }
+    return;
+  }
+
+  const elapsedMs = Date.now() - Math.round(startedAtMs);
+  if (!Number.isFinite(elapsedMs) || elapsedMs < minFillMs || elapsedMs > maxAgeMs) {
+    throw new HttpError(400, "Sign up verification failed. Please refresh and try again.");
+  }
+}
+
+function assertAuthRateLimit(req, scope, email, options = {}) {
+  const maxPerIp = Number.isFinite(options?.maxPerIp) ? Math.max(0, Math.round(options.maxPerIp)) : 0;
+  const maxPerEmail = Number.isFinite(options?.maxPerEmail) ? Math.max(0, Math.round(options.maxPerEmail)) : 0;
+  const windowMs = Number.isFinite(AUTH_RATE_LIMIT_WINDOW_MS) && AUTH_RATE_LIMIT_WINDOW_MS > 1000
+    ? Math.round(AUTH_RATE_LIMIT_WINDOW_MS)
+    : 10 * 60 * 1000;
+  const message =
+    typeof options?.message === "string" && options.message.trim()
+      ? options.message.trim()
+      : "Too many authentication attempts. Please try again later.";
+
+  const ip = getClientIp(req);
+  if (maxPerIp > 0 && ip) {
+    consumeAuthRateLimit(`auth:${scope}:ip:${ip}`, maxPerIp, windowMs, message);
+  }
+
+  const normalizedEmail = normalizeEmail(email);
+  if (maxPerEmail > 0 && normalizedEmail) {
+    consumeAuthRateLimit(`auth:${scope}:email:${normalizedEmail}`, maxPerEmail, windowMs, message);
+  }
+}
+
+function consumeAuthRateLimit(bucketKey, maxAllowed, windowMs, message) {
+  const now = Date.now();
+  const existing = AUTH_RATE_BUCKETS.get(bucketKey);
+
+  if (!existing || !Number.isFinite(existing.resetAt) || existing.resetAt <= now) {
+    AUTH_RATE_BUCKETS.set(bucketKey, {
+      count: 1,
+      resetAt: now + windowMs
+    });
+    pruneAuthRateBuckets(now);
+    return;
+  }
+
+  if (existing.count >= maxAllowed) {
+    throw new HttpError(429, message);
+  }
+
+  existing.count += 1;
+}
+
+function pruneAuthRateBuckets(now = Date.now()) {
+  if (AUTH_RATE_BUCKETS.size < 300) {
+    return;
+  }
+
+  for (const [key, entry] of AUTH_RATE_BUCKETS.entries()) {
+    if (!entry || !Number.isFinite(entry.resetAt) || entry.resetAt <= now) {
+      AUTH_RATE_BUCKETS.delete(key);
+    }
+  }
+
+  if (AUTH_RATE_BUCKETS.size <= 12000) {
+    return;
+  }
+
+  const overflow = AUTH_RATE_BUCKETS.size - 12000;
+  let removed = 0;
+  for (const key of AUTH_RATE_BUCKETS.keys()) {
+    AUTH_RATE_BUCKETS.delete(key);
+    removed += 1;
+    if (removed >= overflow) {
+      break;
+    }
+  }
 }
 
 function isValidExtensionRedirectUri(raw) {
@@ -3562,24 +4538,65 @@ function convertUsdSubunitsToCurrencySubunits(usdSubunits, currencyRaw) {
   return Math.round(usdAmount);
 }
 
+function buildTopupPackCatalogUsd() {
+  return TOPUP_PACK_DEFS.map((pack) => {
+    const credits = Number.isFinite(pack.credits) && pack.credits > 0 ? Math.round(pack.credits) : 0;
+    const discountPercent =
+      Number.isFinite(pack.discountPercent) && pack.discountPercent >= 0 ? Math.min(70, Math.round(pack.discountPercent)) : 0;
+    const maxUsdAmountSubunits =
+      Number.isFinite(pack.maxUsdAmountSubunits) && pack.maxUsdAmountSubunits > 0
+        ? Math.round(pack.maxUsdAmountSubunits)
+        : null;
+    const undiscountedAmount = Math.round(credits * DEFAULT_PROMPT_SELL_PRICE_USD_CENTS);
+    const discountedAmountUncapped = Math.max(
+      1,
+      Math.round(undiscountedAmount * ((100 - discountPercent) / 100))
+    );
+    const discountedAmount = maxUsdAmountSubunits === null
+      ? discountedAmountUncapped
+      : Math.max(1, Math.min(discountedAmountUncapped, maxUsdAmountSubunits));
+
+    return {
+      code: String(pack.code || "").trim(),
+      credits,
+      usdAmountSubunits: discountedAmount
+    };
+  }).filter((entry) => entry.code && entry.credits > 0 && entry.usdAmountSubunits > 0);
+}
+
+function buildTopupCatalogForCurrency(currencyRaw) {
+  const currency = resolveSupportedCurrency(currencyRaw);
+  return TOPUP_PACKS_USD.map((pack) => {
+    const amountSubunits = convertUsdSubunitsToCurrencySubunits(pack.usdAmountSubunits, currency);
+    const pricePerCreditSubunits = Math.max(0, Math.round(amountSubunits / pack.credits));
+    return {
+      code: pack.code,
+      credits: pack.credits,
+      amountSubunits,
+      pricePerCreditSubunits,
+      currency
+    };
+  });
+}
+
+function getTopupPackByCode(raw) {
+  if (typeof raw !== "string" || !raw.trim()) {
+    return null;
+  }
+  const code = raw.trim().toLowerCase();
+  return TOPUP_PACKS_USD.find((pack) => pack.code === code) || null;
+}
+
 function buildPricingContext(req) {
   const country = getRequestCountryCode(req);
   const currency = getCurrencyForCountryCode(country);
   const proMonthlyUsd = Number.isFinite(RAZORPAY_PRO_AMOUNT_SUBUNITS) && RAZORPAY_PRO_AMOUNT_SUBUNITS > 0
     ? Math.round(RAZORPAY_PRO_AMOUNT_SUBUNITS)
     : PLAN_CONFIG.pro.priceUsdCents;
-  const unlimitedMonthlyUsd =
-    Number.isFinite(RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS) && RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS > 0
-      ? Math.round(RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS)
-      : PLAN_CONFIG.unlimited.priceUsdCents;
   const proAnnualUsd =
     Number.isFinite(RAZORPAY_PRO_ANNUAL_AMOUNT_SUBUNITS) && RAZORPAY_PRO_ANNUAL_AMOUNT_SUBUNITS > 0
       ? Math.round(RAZORPAY_PRO_ANNUAL_AMOUNT_SUBUNITS)
       : Math.round(proMonthlyUsd * 12 * 0.8);
-  const unlimitedAnnualUsd =
-    Number.isFinite(RAZORPAY_UNLIMITED_ANNUAL_AMOUNT_SUBUNITS) && RAZORPAY_UNLIMITED_ANNUAL_AMOUNT_SUBUNITS > 0
-      ? Math.round(RAZORPAY_UNLIMITED_ANNUAL_AMOUNT_SUBUNITS)
-      : Math.round(unlimitedMonthlyUsd * 12 * 0.8);
 
   const plans = [
     {
@@ -3593,19 +4610,14 @@ function buildPricingContext(req) {
       monthlyAmountSubunits: convertUsdSubunitsToCurrencySubunits(proMonthlyUsd, currency),
       annualAmountSubunits: convertUsdSubunitsToCurrencySubunits(proAnnualUsd, currency),
       monthlyQuota: PLAN_CONFIG.pro.monthlyQuota
-    },
-    {
-      code: "unlimited",
-      monthlyAmountSubunits: convertUsdSubunitsToCurrencySubunits(unlimitedMonthlyUsd, currency),
-      annualAmountSubunits: convertUsdSubunitsToCurrencySubunits(unlimitedAnnualUsd, currency),
-      monthlyQuota: PLAN_CONFIG.unlimited.monthlyQuota
     }
   ];
 
   return {
     country: country || "UNKNOWN",
     currency,
-    plans
+    plans,
+    topups: buildTopupCatalogForCurrency(currency)
   };
 }
 
@@ -3618,19 +4630,15 @@ function ensureRazorpayConfigured() {
 
 function getRazorpayChargeForPlan(planCode, billingCycleRaw, currencyRaw) {
   const normalized = normalizeUserPlanCode(planCode);
-  if (normalized !== "pro" && normalized !== "unlimited") {
-    throw new HttpError(400, "Paid plans only: pro, unlimited.");
+  if (normalized !== "pro") {
+    throw new HttpError(400, "Paid plans only: pro.");
   }
 
   const billingCycle = normalizeBillingCycle(billingCycleRaw);
   const baseUsdAmountSubunits =
     billingCycle === "annual"
-      ? normalized === "pro"
-        ? RAZORPAY_PRO_ANNUAL_AMOUNT_SUBUNITS
-        : RAZORPAY_UNLIMITED_ANNUAL_AMOUNT_SUBUNITS
-      : normalized === "pro"
-        ? RAZORPAY_PRO_AMOUNT_SUBUNITS
-        : RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS;
+      ? RAZORPAY_PRO_ANNUAL_AMOUNT_SUBUNITS
+      : RAZORPAY_PRO_AMOUNT_SUBUNITS;
 
   const monthlyUsdAmount = PLAN_CONFIG[normalized].priceUsdCents;
   const annualUsdAmount = Math.round(monthlyUsdAmount * 12 * 0.8);
@@ -3682,6 +4690,9 @@ async function razorpayRequest(method, pathName, body = null) {
         : typeof payload?.error?.reason === "string"
           ? payload.error.reason.trim()
           : "";
+    
+    console.error(`[razorpay-error] ${method} ${pathName} failed (${response.status}):`, payload || "No payload");
+    
     throw new HttpError(502, providerMessage || `Razorpay request failed (${response.status}).`);
   }
 

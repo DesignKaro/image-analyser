@@ -17,6 +17,7 @@ import {
   PlanSnapshot,
   PricingContextSnapshot,
   PricingPlanSnapshot,
+  PricingTopupSnapshot,
   SubscriptionSnapshot,
   UsageSnapshot,
   UserPlanCode,
@@ -29,22 +30,17 @@ import {
   BrandMarkIcon,
   CheckIcon,
   ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ChevronUpIcon,
   CloseIcon,
   CopyIcon,
   GoogleIcon,
   ImageIcon,
   LayersIcon,
-  PenIcon,
-  PuzzleIcon,
   SaveIcon,
   ServerIcon,
   ShareIcon,
   ShieldIcon,
   SparkIcon,
-  SearchIcon,
   UploadIcon,
   UserIcon,
   BoxIcon
@@ -68,34 +64,50 @@ type DemoImageSample = {
   fileName: string;
 };
 
-const SAMPLE_IMAGES: LlmTarget[] = [
+const LLM_ICONS_BASE = "/Assets/llm%20logo";
+
+const SUPPORTED_LLM_IMAGES: LlmTarget[] = [
   {
     label: "ChatGPT",
     url: "https://chatgpt.com/",
-    thumb: "https://www.google.com/s2/favicons?domain=chatgpt.com&sz=256",
+    thumb: `${LLM_ICONS_BASE}/chatgpt-logo_svgstack_com_36931772287327.svg`,
     prefillParam: "q"
   },
   {
-    label: "Gemini",
+    label: "Microsoft Copilot",
+    url: "https://copilot.microsoft.com/",
+    thumb: `${LLM_ICONS_BASE}/copilot-color.svg`
+  },
+  {
+    label: "Google Gemini",
     url: "https://gemini.google.com/app",
-    thumb: "https://www.google.com/s2/favicons?domain=gemini.google.com&sz=256",
-    prefillParam: undefined
+    thumb: `${LLM_ICONS_BASE}/gemini-logo_svgstack_com_37141772287353.svg`
   },
   {
     label: "Leonardo",
     url: "https://app.leonardo.ai/",
-    thumb: "https://www.google.com/s2/favicons?domain=leonardo.ai&sz=256"
+    thumb: `${LLM_ICONS_BASE}/leonardo-ai-seeklogo.svg`
+  },
+  {
+    label: "Meta AI",
+    url: "https://www.meta.ai/",
+    thumb: `${LLM_ICONS_BASE}/meta-color.svg`
   },
   {
     label: "Grok",
     url: "https://grok.com/",
-    thumb: "https://www.google.com/s2/favicons?domain=grok.com&sz=256",
+    thumb: `${LLM_ICONS_BASE}/grok.svg`,
     prefillParam: "q"
+  },
+  {
+    label: "Midjourney",
+    url: "https://www.midjourney.com/",
+    thumb: `${LLM_ICONS_BASE}/midjourney-logo.svg`
   }
 ];
-const MODAL_LLM_IMAGES = SAMPLE_IMAGES.filter(
-  (item) => item.label === "ChatGPT" || item.label === "Grok"
-);
+
+const SAMPLE_IMAGES: LlmTarget[] = SUPPORTED_LLM_IMAGES;
+const MODAL_LLM_IMAGES: LlmTarget[] = SUPPORTED_LLM_IMAGES;
 
 const SHARE_X_SVG = (
   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden>
@@ -152,12 +164,22 @@ const DEMO_SAMPLE_IMAGES: DemoImageSample[] = [
   }
 ];
 
-const USE_CASE_ICONS = [
+const FEATURE_IMAGES: Record<string, string> = {
+  "Image to prompt AI that actually reads the image":
+    "/Assets/Hompage%20assets/Features/Image%20to%20prompt%20AI%20that%20actually%20reads%20the%20image.png",
+  "JPG, PNG, WebP": "/Assets/Hompage%20assets/Features/JPG,%20PNG,%20WebP.png",
+  "Fast results": "/Assets/Hompage%20assets/Features/Fast%20results.png",
+  "Copy or save": "/Assets/Hompage%20assets/Features/Copy%20or%20save.png",
+  "Your data stays yours": "/Assets/Hompage%20assets/Features/Your%20data%20stays%20yours.png",
+  "Same account on web and extension": "/Assets/Hompage%20assets/Features/Same%20account%20on%20web%20and%20extension.png"
+};
+
+const BENEFIT_ICONS = [
   SparkIcon,
-  PenIcon,
-  ImageIcon,
-  PuzzleIcon,
+  ShieldIcon,
   LayersIcon,
+  CheckIcon,
+  SaveIcon,
   BoxIcon
 ];
 
@@ -500,7 +522,13 @@ type ApiResponse = {
   amount?: number;
   currency?: string;
   billingCycle?: BillingCycle;
+  topupCode?: string;
+  credits?: number;
   message?: string;
+  topup?: {
+    code?: string;
+    credits?: number;
+  };
   prefill?: {
     email?: string;
   };
@@ -629,6 +657,14 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
   );
   const organizationSchema = useMemo(() => buildOrganizationSchema(SITE_BASE_URL), []);
   const webSiteSchema = useMemo(() => buildWebSiteSchema(SITE_BASE_URL), []);
+  const marqueeReviews = useMemo(
+    () => [...content.reviews, ...content.reviews],
+    [content.reviews]
+  );
+  const faqColumns = useMemo(() => {
+    const mid = Math.ceil(content.faqs.length / 2);
+    return [content.faqs.slice(0, mid), content.faqs.slice(mid)];
+  }, [content.faqs]);
   const howToSchema = useMemo(
     () =>
       buildHowToSchema(
@@ -688,6 +724,8 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
   const [usage, setUsage] = useState<UsageSnapshot | null>(null);
   const [authEmail, setAuthEmail] = useState<string>("");
   const [authPassword, setAuthPassword] = useState<string>("");
+  const [authSignupStartedAtMs, setAuthSignupStartedAtMs] = useState<number>(0);
+  const [authCompanyWebsite, setAuthCompanyWebsite] = useState<string>("");
   const [authMessage, setAuthMessage] = useState<string>("");
   const [authSubmitting, setAuthSubmitting] = useState<boolean>(false);
   const [planSubmitting, setPlanSubmitting] = useState<boolean>(false);
@@ -704,22 +742,57 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
   });
   const [profileRefreshLoading, setProfileRefreshLoading] = useState<boolean>(false);
   const [billingAnnual, setBillingAnnual] = useState<boolean>(false);
-  const [useCaseSlide, setUseCaseSlide] = useState<number>(0);
-  const [useCaseCardsPerSlide, setUseCaseCardsPerSlide] = useState<number>(2);
   const [showBackToTop, setShowBackToTop] = useState<boolean>(false);
+  const [promptFormat, setPromptFormat] = useState<string | null>(null);
+  const [openBenefitIndex, setOpenBenefitIndex] = useState<number>(0);
 
   useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const update = () => setUseCaseCardsPerSlide(mq.matches ? 1 : 2);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const selectors = [
+      ".home-main section",
+      ".home-main article",
+      ".home-main .tool-section-head",
+      ".home-main .tool-interface-card",
+      ".home-main .tool-feature-card",
+      ".home-main .tool-usecase-card",
+      ".home-main .tool-usecase-timeline-item",
+      ".home-main .tool-benefit-card",
+      ".home-main .tool-benefit-item",
+      ".home-main .tool-example-card",
+      ".home-main .tool-step-card",
+      ".home-main .tool-related-card",
+      ".home-main .tool-trust-grid article",
+      ".home-main .tool-review-card",
+      ".home-main .tool-faq-title",
+      ".home-main .tool-faq-columns",
+      ".home-main .tool-faq-item",
+      ".home-main .tool-seo-guide-header",
+      ".home-main .tool-seo-guide-block",
+      ".home-main .footer-cta-inner",
+      ".home-main .footer-simple-inner"
+    ];
+
+    const elements = Array.from(document.querySelectorAll<HTMLElement>(selectors.join(", ")));
+    elements.forEach((el) => el.classList.add("scroll-reveal"));
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          entry.target.classList.toggle("is-visible", entry.isIntersecting);
+        });
+      },
+      { threshold: 0.15, rootMargin: "0px 0px -8% 0px" }
+    );
+
+    elements.forEach((el) => observer.observe(el));
+
+    return () => {
+      observer.disconnect();
+      elements.forEach((el) => el.classList.remove("scroll-reveal", "is-visible"));
+    };
   }, []);
-
-  useEffect(() => {
-    const maxSlide = Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1;
-    setUseCaseSlide((s) => Math.min(s, Math.max(0, maxSlide)));
-  }, [useCaseCardsPerSlide, content.useCases.length]);
   const [pricingContext, setPricingContext] = useState<PricingContextSnapshot | null>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -747,6 +820,18 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
       };
     });
   }, [pricingByPlanCode, resolvedPricingContext.currency]);
+
+  const topupOptions = useMemo(() => {
+    const list = Array.isArray(resolvedPricingContext.topups)
+      ? resolvedPricingContext.topups
+          .map(normalizePricingTopupSnapshot)
+          .filter((entry): entry is PricingTopupSnapshot => Boolean(entry))
+      : [];
+
+    return list
+      .slice()
+      .sort((a, b) => a.credits - b.credits);
+  }, [resolvedPricingContext.topups]);
 
   function persistAuthToken(token: string) {
     setAuthToken(token);
@@ -855,15 +940,22 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
     setAuthMessage("");
 
     try {
+      const payloadBody: Record<string, unknown> = {
+        email,
+        password
+      };
+
+      if (authMode === "signup") {
+        payloadBody.signupStartedAtMs = authSignupStartedAtMs || Date.now();
+        payloadBody.companyWebsite = authCompanyWebsite;
+      }
+
       const response = await fetch(`${backendUrl}/api/auth/${authMode}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          email,
-          password
-        })
+        body: JSON.stringify(payloadBody)
       });
 
       const payload = (await response.json().catch(() => ({}))) as ApiResponse;
@@ -1158,6 +1250,112 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
     }
   }
 
+  async function onPurchaseTopup(topupCode: string) {
+    if (!authToken) {
+      setPlanMessage("Sign in to add credits.");
+      openAuthModal("signin");
+      return;
+    }
+
+    if (!topupCode) {
+      setPlanMessage("Select a valid top-up package.");
+      return;
+    }
+
+    setPlanSubmitting(true);
+    setBillingRedirecting(true);
+    setPlanMessage("");
+
+    try {
+      const response = await fetch(`${backendUrl}/api/billing/topup/checkout-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          topupCode
+        })
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as ApiResponse;
+      if (
+        !response.ok ||
+        !payload.ok ||
+        !payload.orderId ||
+        !payload.keyId ||
+        !Number.isFinite(payload.amount) ||
+        !payload.currency
+      ) {
+        throw new Error(payload.error || "Could not create top-up checkout session.");
+      }
+
+      const Razorpay = await ensureRazorpayLoaded();
+      await new Promise<void>((resolve, reject) => {
+        let completed = false;
+        const checkout = new Razorpay({
+          key: payload.keyId || "",
+          amount: Number(payload.amount),
+          currency: payload.currency || "USD",
+          name: "Image to Prompt",
+          description: payload.description || "Add credits",
+          order_id: payload.orderId || "",
+          prefill: {
+            email: payload.prefill?.email || authUser?.email || ""
+          },
+          theme: {
+            color: "#2d6ae3"
+          },
+          modal: {
+            ondismiss: () => {
+              if (!completed) {
+                reject(new Error("Payment canceled."));
+              }
+            }
+          },
+          handler: async (checkoutPayload: RazorpayHandlerPayload) => {
+            try {
+              const verifyResponse = await fetch(`${backendUrl}/api/billing/topup/verify-payment`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${authToken}`
+                },
+                body: JSON.stringify(checkoutPayload)
+              });
+
+              const verifyPayload = (await verifyResponse.json().catch(() => ({}))) as ApiResponse;
+              if (!verifyResponse.ok || !verifyPayload.ok) {
+                throw new Error(verifyPayload.error || "Payment verification failed.");
+              }
+
+              completed = true;
+              applySessionPayload(verifyPayload);
+              const creditsAdded = Number(verifyPayload.topup?.credits ?? payload.credits ?? 0);
+              setPlanMessage(
+                Number.isFinite(creditsAdded) && creditsAdded > 0
+                  ? `${Math.round(creditsAdded)} credits added successfully.`
+                  : "Credits added successfully."
+              );
+              resolve();
+            } catch (verifyError) {
+              const nextMessage =
+                verifyError instanceof Error ? verifyError.message : "Payment verification failed.";
+              reject(new Error(nextMessage));
+            }
+          }
+        });
+        checkout.open();
+      });
+    } catch (topupError) {
+      const message = topupError instanceof Error ? topupError.message : "Could not add credits.";
+      setPlanMessage(message);
+    } finally {
+      setBillingRedirecting(false);
+      setPlanSubmitting(false);
+    }
+  }
+
   function openBillingPage() {
     if (!authToken) {
       openAuthModal("signin");
@@ -1344,6 +1542,10 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
 
   function openAuthModal(mode: AuthMode) {
     setAuthMode(mode);
+    if (mode === "signup") {
+      setAuthSignupStartedAtMs(Date.now());
+      setAuthCompanyWebsite("");
+    }
     setAuthMessage("");
     setAuthModalOpen(true);
   }
@@ -1352,6 +1554,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
     const scopedWindow = window as Window & { google?: { accounts?: { id?: { cancel?: () => void } } } };
     scopedWindow.google?.accounts?.id?.cancel?.();
     setAuthMessage("");
+    setAuthCompanyWebsite("");
     setAuthModalOpen(false);
   }
 
@@ -1388,6 +1591,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
 
   async function onDrop(event: DragEvent<HTMLDivElement>) {
     event.preventDefault();
+    event.stopPropagation();
     setDragActive(false);
     const file = event.dataTransfer.files?.[0];
     if (!file) {
@@ -1422,9 +1626,10 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
     }
   }
 
-  async function onGenerate(source?: { imageDataUrl?: string; imageUrl?: string }) {
+  async function onGenerate(source?: { imageDataUrl?: string; imageUrl?: string; promptFormat?: string | null }) {
     const requestImageDataUrl = source?.imageDataUrl ?? imageDataUrl;
     const requestImageUrl = source?.imageUrl ?? imageUrl;
+    const requestFormat = source?.promptFormat !== undefined ? source.promptFormat : promptFormat;
 
     if (!requestImageDataUrl && !requestImageUrl) {
       setError("Upload an image first.");
@@ -1461,7 +1666,8 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
         body: JSON.stringify({
           model: DEFAULT_MODEL,
           imageDataUrl: requestImageDataUrl || "",
-          imageUrl: requestImageUrl || ""
+          imageUrl: requestImageUrl || "",
+          ...(requestFormat ? { promptFormat: requestFormat } : {})
         })
       });
 
@@ -1472,7 +1678,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
           openAuthModal("signin");
         } else if (response.status === 402) {
           setOutOfCreditsModalOpen(true);
-          setPlanMessage("Monthly usage limit reached. Upgrade your plan to continue.");
+          setPlanMessage("Monthly usage limit reached. Upgrade plan or add credits to continue.");
         }
         throw new Error(payload.error || `Request failed (${response.status})`);
       }
@@ -1624,7 +1830,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
           openAuthModal("signin");
         } else if (response.status === 402) {
           setOutOfCreditsModalOpen(true);
-          setResultTranslateError("Credits exhausted. Upgrade plan to continue.");
+          setResultTranslateError("Credits exhausted. Upgrade plan or add credits to continue.");
         } else {
           setResultTranslateError(payload.error || "Translation failed.");
         }
@@ -1650,25 +1856,32 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
       return;
     }
 
-    const destination = sample.prefillParam
+    const supportsPrefill = sample.label === "ChatGPT" || sample.label === "Grok";
+    const destination = supportsPrefill && sample.prefillParam
       ? `${sample.url}${sample.url.includes("?") ? "&" : "?"}${sample.prefillParam}=${encodeURIComponent(description)}`
       : sample.url;
 
-    // Open first to keep it tied to user gesture and avoid popup blockers.
-    const opened = window.open(destination, "_blank", "noopener,noreferrer");
-    if (!opened) {
-      window.location.href = destination;
-    }
+    const doCopy = () => {
+      navigator.clipboard
+        .writeText(description)
+        .then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1800);
+        })
+        .catch(() => {
+          setCopied(false);
+        });
+    };
 
-    navigator.clipboard
-      .writeText(description)
-      .then(() => {
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 1800);
-      })
-      .catch(() => {
-        setCopied(false);
-      });
+    if (supportsPrefill) {
+      // ChatGPT and Grok: open with prefilled prompt, then copy.
+      window.open(destination, "_blank", "noopener,noreferrer");
+      doCopy();
+    } else {
+      // Others: copy first, then redirect to chatbot page.
+      doCopy();
+      window.open(destination, "_blank", "noopener,noreferrer");
+    }
   }
 
   function onSubscribeNewsletter(event: FormEvent<HTMLFormElement>) {
@@ -1724,7 +1937,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
 
   return (
     <div className="site-shell" data-nav-scrolled={headerScrollProgress > 0.08 ? "" : undefined}>
-      <a href="#home" className="skip-to-main">
+      <a href="/#home" className="skip-to-main">
         Skip to main content
       </a>
       <script
@@ -1762,13 +1975,13 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
         }
       >
         <div className="container nav-inner">
-          <a className="rb-brand" href="#home" aria-label="Image to Prompt">
+          <a className="rb-brand" href="/#home" aria-label="Image to Prompt">
             <BrandMarkIcon className="rb-brand-mark" />
             <span className="rb-brand-text">Image to Prompt</span>
           </a>
 
           <nav className="nav-links" aria-label="Primary">
-            <a href="#upload">Image to Prompt</a>
+            <a href="/#upload">Image to Prompt</a>
             <a href="/bulk">Bulk</a>
             <a href="/chrome-extension">Extension</a>
             <a href="/pricing">Pricing</a>
@@ -1894,14 +2107,14 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
             </p>
             <p className="hero-mini-line">
               <span>Fast, simple and</span>
-              <span className="hero-free-pill">Free</span>
+              <span className="hero-free-pill">100% Free to start</span>
             </p>
             <div className="hero-cta-row">
-              <a href="#upload" className="hero-cta-btn hero-cta-primary">
-                Get Started
+              <a href="/#upload" className="hero-cta-btn hero-cta-primary">
+                Generate Prompt
               </a>
-              <a href="#pricing" className="hero-cta-btn hero-cta-secondary">
-                Pricing
+              <a href="/#tool-interface" className="hero-cta-btn hero-cta-secondary">
+                See How it Works
               </a>
             </div>
 
@@ -1918,6 +2131,9 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={sample.thumb} alt={sample.label} loading="lazy" />
+                  <span className="hero-llm-tooltip" aria-hidden>
+                    {sample.label}
+                  </span>
                 </a>
               ))}
             </div>
@@ -2002,7 +2218,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                     setPlanModalOpen(true);
                   }}
                 >
-                  Upgrade plan
+                  {currentPlanCode === "pro" ? "Add credits" : "Upgrade plan"}
                 </button>
               </div>
             ) : null}
@@ -2011,14 +2227,20 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
               className={`upload-card ${dragActive ? "is-drag-active" : ""}`}
               onDragEnter={(event) => {
                 event.preventDefault();
+                event.stopPropagation();
                 setDragActive(true);
               }}
               onDragOver={(event) => {
                 event.preventDefault();
+                event.stopPropagation();
+                if (event.dataTransfer) {
+                  event.dataTransfer.dropEffect = "copy";
+                }
                 setDragActive(true);
               }}
               onDragLeave={(event) => {
                 event.preventDefault();
+                event.stopPropagation();
                 setDragActive(false);
               }}
               onDrop={onDrop}
@@ -2060,6 +2282,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                   <figcaption>{imageName}</figcaption>
                 </figure>
               ) : null}
+
             </div>
 
             {!imageDataUrl ? (
@@ -2087,8 +2310,8 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                   </div>
                 </div>
                 <p className="quick-samples-note">
-                  By uploading an image or URL you agree to our <a href="#terms">Terms of Service</a>. To learn more
-                  about how remove.bg handles your personal data, check our <a href="#privacy">Privacy Policy</a>.
+                  By uploading an image or URL you agree to our <a href="/#terms">Terms of Service</a>. To learn more
+                  about how remove.bg handles your personal data, check our <a href="/#privacy">Privacy Policy</a>.
                 </p>
               </div>
             ) : null}
@@ -2121,7 +2344,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
             {content.toolInterfaceIntro}
           </p>
         </div>
-        <div className="tool-interface-grid">
+        <div className="tool-interface-grid scroll-stagger">
           {content.toolInterfaceCards.map((card, i) => (
             <article key={card.title} className="tool-interface-card">
               {i === 0 ? <BoxIcon className="tool-interface-icon" /> : i === 1 ? <SparkIcon className="tool-interface-icon" /> : <LayersIcon className="tool-interface-icon" />}
@@ -2132,36 +2355,25 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
         </div>
       </section>
 
-      <section className="container tool-how-section" id="how-to-use" aria-label="How to use">
-        <div className="tool-section-head">
-          <p className="tool-section-kicker">{content.howToUseKicker}</p>
-          <h2>{content.howToUseH2}</h2>
-          <p>
-            {content.howToUseIntro}
-          </p>
-        </div>
-        <ol className="tool-step-list">
-          {content.steps.map((step) => (
-            <li key={step.title} className="tool-step-card">
-              <h3>{step.title}</h3>
-              <p>{step.description}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
-
       <section className="container tool-features-section" id="features" aria-label="Features">
         <div className="tool-section-head">
           <p className="tool-section-kicker">{content.featuresKicker}</p>
           <h2>{content.featuresH2}</h2>
         </div>
-        <div className="tool-feature-grid">
-          {content.features.map((feature) => (
-            <article key={feature.title} className="tool-feature-card">
-              <h3>{feature.title}</h3>
-              <p>{feature.description}</p>
-            </article>
-          ))}
+        <div className="tool-feature-grid scroll-stagger">
+          {content.features.map((feature) => {
+            const featureImage = FEATURE_IMAGES[feature.title];
+            return (
+              <article key={feature.title} className="tool-feature-card">
+                {featureImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="tool-feature-image" src={featureImage} alt={feature.title} loading="lazy" />
+                ) : null}
+                <h3>{feature.title}</h3>
+                <p>{feature.description}</p>
+              </article>
+            );
+          })}
         </div>
       </section>
 
@@ -2171,11 +2383,11 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
             <p className="tool-section-kicker">{content.examplesKicker}</p>
             <h2>{content.examplesH2}</h2>
           </div>
-          <div className="tool-example-grid">
+          <div className="tool-example-grid tool-example-grid-cards scroll-stagger">
             {content.examples.map((example, index) => (
               <article
                 key={example.title}
-                className={`tool-example-card ${index % 2 === 1 ? "tool-example-card-flip" : ""}`}
+                className={`tool-example-card tool-example-card-vertical ${index % 2 === 1 ? "tool-example-card-flip" : ""}`}
               >
                 <figure>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2196,89 +2408,60 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
           <p className="tool-section-kicker">{content.useCasesKicker}</p>
           <h2>{content.useCasesH2}</h2>
         </div>
-        <div
-          className="tool-usecase-carousel-wrap"
-          style={
-            { "--usecase-slides": Math.ceil(content.useCases.length / useCaseCardsPerSlide) } as CSSProperties
-          }
-        >
-          <button
-            type="button"
-            className="tool-usecase-carousel-btn tool-usecase-carousel-btn-prev"
-            onClick={() => setUseCaseSlide((s) => Math.max(0, s - 1))}
-            disabled={useCaseSlide === 0}
-            aria-label="Previous use cases"
-          >
-            <ChevronLeftIcon aria-hidden />
-          </button>
-          <div className="tool-usecase-carousel-viewport">
-            <div
-              className="tool-usecase-carousel-track"
-              style={{
-                width: `${Math.ceil(content.useCases.length / useCaseCardsPerSlide) * 100}%`,
-                transform: `translateX(-${Math.min(useCaseSlide, Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1) * (100 / Math.ceil(content.useCases.length / useCaseCardsPerSlide))}%)`
-              }}
-            >
-              {Array.from({ length: Math.ceil(content.useCases.length / useCaseCardsPerSlide) }).map((_, slideIndex) => (
-                <div key={slideIndex} className="tool-usecase-carousel-slide">
-                  {content.useCases.slice(slideIndex * useCaseCardsPerSlide, slideIndex * useCaseCardsPerSlide + useCaseCardsPerSlide).map((useCase, i) => {
-                    const index = slideIndex * useCaseCardsPerSlide + i;
-                    const IconComponent = USE_CASE_ICONS[index];
-                    return (
-                      <article key={useCase.title} className="tool-usecase-card tool-usecase-carousel-card">
-                        {IconComponent ? (
-                          <span className="tool-usecase-icon" aria-hidden>
-                            <IconComponent />
-                          </span>
-                        ) : null}
-                        <h3>{useCase.title}</h3>
-                        <p>{useCase.description}</p>
-                      </article>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-          <button
-            type="button"
-            className="tool-usecase-carousel-btn tool-usecase-carousel-btn-next"
-            onClick={() =>
-              setUseCaseSlide((s) => Math.min(Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1, s + 1))
-            }
-            disabled={useCaseSlide >= Math.ceil(content.useCases.length / useCaseCardsPerSlide) - 1}
-            aria-label="Next use cases"
-          >
-            <ChevronRightIcon aria-hidden />
-          </button>
-        </div>
-        <div className="tool-usecase-carousel-dots" role="tablist" aria-label="Use case slides">
-          {Array.from({ length: Math.ceil(content.useCases.length / useCaseCardsPerSlide) }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              role="tab"
-              aria-selected={useCaseSlide === i}
-              aria-label={`Slide ${i + 1}`}
-              className={`tool-usecase-carousel-dot ${useCaseSlide === i ? "is-active" : ""}`}
-              onClick={() => setUseCaseSlide(i)}
-            />
+        <ol className="tool-usecase-timeline scroll-stagger">
+          {content.useCases.map((useCase, index) => (
+            <li key={useCase.title} className="tool-usecase-timeline-item">
+              <span className="tool-usecase-timeline-badge">{index + 1}.</span>
+              <span className="tool-usecase-timeline-line" aria-hidden="true" />
+              <h3>{useCase.title}</h3>
+              <p>{useCase.description}</p>
+            </li>
           ))}
-        </div>
+        </ol>
       </section>
 
       <section className="container tool-benefits-section" id="benefits" aria-label="Benefits">
-        <div className="tool-section-head">
-          <p className="tool-section-kicker">{content.benefitsKicker}</p>
-          <h2>{content.benefitsH2}</h2>
-        </div>
-        <div className="tool-benefit-grid">
-          {content.benefits.map((benefit) => (
-            <article key={benefit.title} className="tool-benefit-card">
-              <h3>{benefit.title}</h3>
-              <p>{benefit.description}</p>
-            </article>
-          ))}
+        <div className="tool-benefits-layout">
+          <div className="tool-benefits-media">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/Assets/portfolio-websiteFinal-Cooper-0226-29.webp"
+              alt="Team collaborating at a desk"
+              loading="lazy"
+            />
+          </div>
+          <div className="tool-benefits-content">
+            <div className="tool-benefits-head">
+              <span className="tool-benefits-pill">{content.benefitsKicker}</span>
+              <h2>{content.benefitsH2}</h2>
+            </div>
+            <div className="tool-benefit-accordion scroll-stagger">
+              {content.benefits.map((benefit, index) => {
+                const IconComponent = BENEFIT_ICONS[index % BENEFIT_ICONS.length];
+                return (
+                  <details key={benefit.title} className="tool-benefit-item" open={openBenefitIndex === index}>
+                    <summary
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setOpenBenefitIndex((current) => (current === index ? -1 : index));
+                      }}
+                    >
+                      <span className="tool-benefit-summary">
+                        <span className="tool-benefit-icon" aria-hidden>
+                          <IconComponent />
+                        </span>
+                        <span className="tool-benefit-title">{benefit.title}</span>
+                      </span>
+                      <ChevronDownIcon className="tool-benefit-chevron" aria-hidden />
+                    </summary>
+                    <div className="tool-benefit-body">
+                      <p>{benefit.description}</p>
+                    </div>
+                  </details>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -2307,7 +2490,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
           </button>
         </div>
         <div className="pricing-grid">
-          {PRICING_CARDS.map((card) => {
+          {PRICING_CARDS.slice(0, 2).map((card) => {
             const planPricing = pricingByPlanCode[card.code];
             const monthlyAmountSubunits = planPricing?.monthlyAmountSubunits ?? 0;
             const annualAmountSubunits = planPricing?.annualAmountSubunits ?? 0;
@@ -2359,30 +2542,42 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
             );
           })}
         </div>
+        <div className="pricing-topup-cta" aria-label="Credit top-up CTA">
+          <div className="pricing-topup-cta-copy">
+            <h3>Need more credits?</h3>
+            <p>We have a top-up credits feature for one-time add-ons whenever you need extra prompts.</p>
+          </div>
+          <button
+            type="button"
+            className="pricing-topup-cta-btn"
+            onClick={() => router.push("/pricing")}
+          >
+            View top-up pricing
+          </button>
+        </div>
       </section>
 
       <section className="container tool-faq-section" id="faqs" aria-label="Frequently asked questions">
-        <div className="tool-faq-head">
-          <p className="tool-section-kicker">FAQs</p>
-          <h2>Frequently asked questions</h2>
-          <p className="tool-faq-subtitle">Have questions? We&apos;re here to help.</p>
-        </div>
-        <div className="tool-faq-search-wrap">
-          <SearchIcon className="tool-faq-search-icon" aria-hidden />
-          <input
-            type="search"
-            className="tool-faq-search"
-            placeholder="Search"
-            aria-label="Search FAQs"
-          />
-        </div>
-        <div className="tool-faq-list">
-          {content.faqs.map((item, index) => (
-            <details key={item.question} open={index === 0} className="tool-faq-item">
-              <summary>{item.question}</summary>
-              <p>{item.answer}</p>
-            </details>
-          ))}
+        <div className="tool-faq-layout">
+          <div className="tool-faq-title" data-reveal="left">
+            <h2>
+              Frequently
+              <br />
+              Asked Questions
+            </h2>
+          </div>
+          <div className="tool-faq-columns" aria-label="FAQ list" data-reveal="right">
+            {faqColumns.map((column, colIndex) => (
+              <div key={`faq-col-${colIndex}`} className="tool-faq-col scroll-stagger">
+                {column.map((item) => (
+                  <details key={item.question} className="tool-faq-item">
+                    <summary>{item.question}</summary>
+                    <p>{item.answer}</p>
+                  </details>
+                ))}
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -2395,7 +2590,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
               {content.seoGuideIntro}
             </p>
           </div>
-          <article className="tool-seo-article">
+          <article className="tool-seo-article scroll-stagger">
             {content.seoCopy.map((section) => (
               <div key={section.heading} className="tool-seo-guide-block">
                 <h3>{section.heading}</h3>
@@ -2413,7 +2608,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
           <p className="tool-section-kicker">{content.trustKicker}</p>
           <h2>{content.trustH2}</h2>
         </div>
-        <div className="tool-trust-grid">
+        <div className="tool-trust-grid scroll-stagger">
           {content.trustCards.map((card, i) => (
             <article key={card.title}>
               {i === 0 ? <ShieldIcon className="tool-trust-icon" /> : i === 1 ? <ServerIcon className="tool-trust-icon" /> : <CheckIcon className="tool-trust-icon" />}
@@ -2429,25 +2624,58 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
           <p className="tool-section-kicker">{content.reviewsKicker}</p>
           <h2>{content.reviewsH2}</h2>
         </div>
-        <div className="tool-reviews-grid">
-          {content.reviews.map((review, i) => (
-            <article key={`${review.name}-${i}`} className="tool-review-card">
-              <div className="tool-review-header">
-                <div className="tool-review-meta">
-                  <span className="tool-review-name">{review.name}</span>
-                  <span className="tool-review-location">{review.location}</span>
+        <div className="tool-reviews-marquee">
+          <div className="tool-reviews-rows" role="presentation">
+            {[0, 1].map((row) => (
+              <div
+                key={`review-row-${row}`}
+                className={`tool-reviews-row ${row === 1 ? "is-reverse" : ""}`}
+                onMouseMove={(event) => {
+                  const container = event.currentTarget;
+                  const rect = container.getBoundingClientRect();
+                  const x = event.clientX - rect.left;
+                  const y = event.clientY - rect.top;
+                  container.style.setProperty("--review-x", `${x}px`);
+                  container.style.setProperty("--review-y", `${y}px`);
+                  container.dataset.hover = "true";
+                }}
+                onMouseLeave={(event) => {
+                  delete event.currentTarget.dataset.hover;
+                }}
+              >
+                <div className="tool-reviews-track">
+                  {marqueeReviews.map((review, i) => {
+                    const isDuplicate = i >= content.reviews.length;
+                    return (
+                      <article
+                        key={`${review.name}-${i}-row-${row}`}
+                        className="tool-review-card tool-review-card--marquee"
+                        aria-hidden={isDuplicate}
+                        tabIndex={isDuplicate ? -1 : undefined}
+                      >
+                        <div className="tool-review-panel">
+                          <div className="tool-review-header">
+                            <div className="tool-review-stars" aria-label="5 out of 5 stars">
+                              {[1, 2, 3, 4, 5].map((n) => (
+                                <span key={n} className="tool-review-star" aria-hidden>★</span>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="tool-review-divider" aria-hidden />
+                          <h3 className="tool-review-title">{review.title}</h3>
+                          <p className="tool-review-body">{review.body}</p>
+                        </div>
+                        <div className="tool-review-footer">
+                          <span className="tool-review-name">{review.name}</span>
+                          <span className="tool-review-location">{review.location}</span>
+                        </div>
+                      </article>
+                    );
+                  })}
                 </div>
-                <span className="tool-review-date">{review.date}</span>
               </div>
-              <div className="tool-review-stars" aria-label="5 out of 5 stars">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <span key={n} className="tool-review-star" aria-hidden>★</span>
-                ))}
-              </div>
-              <h3 className="tool-review-title">{review.title}</h3>
-              <p className="tool-review-body">{review.body}</p>
-            </article>
-          ))}
+            ))}
+          </div>
         </div>
       </section>
 
@@ -2469,22 +2697,49 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                 <div className="result-modal-image-col">
                   <h2>Uploaded Image</h2>
                   <figure className="result-modal-image-frame">
+                    <figcaption>{imageName}</figcaption>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={imageDataUrl} alt={imageName || "Uploaded image"} />
-                    <figcaption>{imageName}</figcaption>
                   </figure>
+                  <div className="prompt-format-row">
+                    <p className="prompt-format-label">Format <span className="prompt-format-credit">+1 credit</span></p>
+                    <div className="prompt-format-tags">
+                      {([
+                        { id: "structured", label: "Structured Prompt" },
+                        { id: "graphic-design", label: "Graphic Design" },
+                        { id: "json", label: "JSON" }
+                      ] as const).map(({ id, label }) => {
+                        const isActive = promptFormat === id;
+                        const isGenerating = loading && isActive;
+                        return (
+                          <button
+                            key={id}
+                            type="button"
+                            className={`prompt-format-tag ${isActive ? "is-active" : ""} ${isGenerating ? "is-generating" : ""}`}
+                            onClick={() => {
+                              const next = promptFormat === id ? null : id;
+                              setPromptFormat(next);
+                              if (next) {
+                                void onGenerate({ promptFormat: next });
+                              }
+                            }}
+                            disabled={loading}
+                            aria-pressed={isActive}
+                            aria-busy={isGenerating}
+                          >
+                            {isGenerating ? "Generating…" : label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="result-modal-output-col">
                   <div className="result-modal-head">
                     <h2>GPT Prompt Output</h2>
                     <div className="result-modal-head-actions">
-                      {(resultSaved || copied) && (
-                        <span className="result-modal-action-feedback" role="status">
-                          {resultSaved && copied ? "Saved · Copied" : resultSaved ? "Saved" : "Copied"}
-                        </span>
-                      )}
-                      <div className="result-modal-share-wrap" ref={shareMenuRef}>
+                      <div className="result-modal-share-wrap result-modal-action-tooltip-wrap" ref={shareMenuRef}>
                         <button
                           type="button"
                           className={`result-modal-head-btn ${shareMenuOpen ? "is-active" : ""}`}
@@ -2496,6 +2751,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                         >
                           <ShareIcon className="button-icon" />
                         </button>
+                        <span className="result-modal-llm-tooltip">Share</span>
                         {shareMenuOpen && (
                           <div className="result-modal-share-menu" role="menu">
                             <a
@@ -2559,23 +2815,41 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                           </div>
                         )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={onSaveResult}
-                        disabled={resultSaveBusy || resultSaved || !resultRequestId || !description}
-                        aria-label={resultSaved ? "Saved" : resultSaveBusy ? "Saving..." : "Save prompt"}
-                        title={resultSaved ? "Saved" : resultSaveBusy ? "Saving..." : "Save prompt"}
-                      >
-                        <SaveIcon className="button-icon" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={onCopyResult}
-                        aria-label={copied ? "Copied" : "Copy text"}
-                        title={copied ? "Copied" : "Copy"}
-                      >
-                        <CopyIcon className="button-icon" />
-                      </button>
+                      <div className="result-modal-action-tooltip-wrap">
+                        <button
+                          type="button"
+                          onClick={onSaveResult}
+                          disabled={resultSaveBusy || resultSaved || !resultRequestId || !description}
+                          aria-label={resultSaved ? "Saved" : resultSaveBusy ? "Saving..." : "Save prompt"}
+                          title={resultSaved ? "Saved" : resultSaveBusy ? "Saving..." : "Save prompt"}
+                        >
+                          <SaveIcon className="button-icon" />
+                        </button>
+                        <span className="result-modal-llm-tooltip">{resultSaved ? "Saved" : "Save"}</span>
+                      </div>
+                      <div className="result-modal-action-tooltip-wrap">
+                        <button
+                          type="button"
+                          onClick={onCopyResult}
+                          aria-label={copied ? "Copied" : "Copy text"}
+                          title={copied ? "Copied" : "Copy"}
+                        >
+                          <CopyIcon className="button-icon" />
+                        </button>
+                        <span className="result-modal-llm-tooltip">{copied ? "Copied" : "Copy"}</span>
+                      </div>
+                      <div className="result-modal-action-tooltip-wrap">
+                        <button
+                          type="button"
+                          className="result-modal-head-btn"
+                          onClick={() => setResultModalOpen(false)}
+                          aria-label="Close"
+                          title="Close"
+                        >
+                          <CloseIcon className="button-icon" />
+                        </button>
+                        <span className="result-modal-llm-tooltip">Close</span>
+                      </div>
                     </div>
                   </div>
                   {resultSaveError ? <p className="result-modal-save-error">{resultSaveError}</p> : null}
@@ -2597,13 +2871,6 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                     }}
                   >
                     Generate another image
-                  </button>
-                  <button
-                    type="button"
-                    className="result-modal-close-action"
-                    onClick={() => setResultModalOpen(false)}
-                  >
-                    Close
                   </button>
                 </div>
                 <div className="result-modal-llm-icons" aria-label="Supported models">
@@ -2632,7 +2899,6 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                       <span className="result-modal-translate-error">{resultTranslateError}</span>
                     ) : null}
                   </div>
-                  <span className="result-modal-llm-note">Paste into AI and generate</span>
                   {MODAL_LLM_IMAGES.map((sample) => (
                     <button
                       type="button"
@@ -2644,6 +2910,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={sample.thumb} alt={sample.label} loading="lazy" />
+                      <span className="result-modal-llm-tooltip">{sample.label}</span>
                     </button>
                   ))}
                 </div>
@@ -2678,7 +2945,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
               </button>
             </div>
             <p className="out-of-credits-modal-copy">
-              You&apos;ve used all {usage?.limit ?? "your"} prompts this month. Upgrade your plan to keep generating.
+              You&apos;ve used all {usage?.limit ?? "your"} prompts this month. Upgrade plan or add credits to keep generating.
             </p>
             {usage ? (
               <p className="usage-strip-meta out-of-credits-usage">
@@ -2694,7 +2961,7 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                   setPlanModalOpen(true);
                 }}
               >
-                Upgrade plan
+                {currentPlanCode === "pro" ? "Add credits" : "Upgrade plan"}
               </button>
               <button
                 type="button"
@@ -2730,6 +2997,8 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                   className={`auth-mode-button ${authMode === "signup" ? "is-active" : ""}`}
                   onClick={() => {
                     setAuthMode("signup");
+                    setAuthSignupStartedAtMs(Date.now());
+                    setAuthCompanyWebsite("");
                     setAuthMessage("");
                   }}
                 >
@@ -2760,6 +3029,20 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                 <div className="auth-name-row">
                   <input type="text" name="firstName" placeholder="First name" autoComplete="given-name" />
                   <input type="text" name="lastName" placeholder="Last name" autoComplete="family-name" />
+                </div>
+              ) : null}
+              {authMode === "signup" ? (
+                <div className="auth-honeypot-wrap" aria-hidden="true">
+                  <label htmlFor="auth-company-website">Company website</label>
+                  <input
+                    id="auth-company-website"
+                    type="text"
+                    name="companyWebsite"
+                    tabIndex={-1}
+                    autoComplete="off"
+                    value={authCompanyWebsite}
+                    onChange={(event) => setAuthCompanyWebsite(event.target.value)}
+                  />
                 </div>
               ) : null}
 
@@ -2898,6 +3181,25 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                       </button>
                     ))}
                   </div>
+                  {topupOptions.length > 0 ? (
+                    <>
+                      <h3 className="profile-topup-title">Add credits</h3>
+                      <div className="profile-topup-row">
+                        {topupOptions.map((topup) => (
+                          <button
+                            key={topup.code}
+                            type="button"
+                            className="profile-topup-btn"
+                            disabled={planSubmitting || billingRedirecting}
+                            onClick={() => void onPurchaseTopup(topup.code)}
+                          >
+                            <span>{topup.credits} credits</span>
+                            <span>{formatCurrencySubunits(topup.amountSubunits, resolvedPricingContext.currency)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : null}
                   <div className="profile-actions">
                     <button
                       type="button"
@@ -3001,6 +3303,25 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
                     })}
                   </div>
                 </article>
+                {topupOptions.length > 0 ? (
+                  <article className="profile-card plan-modal-cards">
+                    <h3 className="profile-topup-title">Need more prompts this month?</h3>
+                    <div className="profile-topup-row">
+                      {topupOptions.map((topup) => (
+                        <button
+                          key={topup.code}
+                          type="button"
+                          className="profile-topup-btn"
+                          disabled={planSubmitting || billingRedirecting}
+                          onClick={() => void onPurchaseTopup(topup.code)}
+                        >
+                          <span>{topup.credits} credits</span>
+                          <span>{formatCurrencySubunits(topup.amountSubunits, resolvedPricingContext.currency)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </article>
+                ) : null}
                 {planMessage ? <p className="profile-message">{planMessage}</p> : null}
                 <div className="plan-modal-actions">
                   <button
@@ -3025,20 +3346,39 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
         </div>
       ) : null}
 
+      <section className="footer-cta" aria-label="Call to action">
+        <div className="footer-grid-pattern" />
+        <div className="container footer-cta-inner" data-reveal="scale">
+          <h2>Ready to generate better prompts?</h2>
+          <p>
+            Join thousands of creators, marketers, and product teams turning visuals into structured AI prompts faster.
+          </p>
+          <div className="cta-actions">
+            <button
+              className="cta-btn cta-btn-primary"
+              onClick={() => {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+                setTimeout(() => document.getElementById("hero-upload-input")?.click(), 300);
+              }}
+            >
+              <UploadIcon style={{ width: 18, height: 18 }} />
+              Upload an Image Now
+            </button>
+          </div>
+        </div>
+      </section>
+
       <footer className="footer footer-simple" id="footer-links">
         <div className="container footer-simple-inner">
           <div className="footer-simple-head">
             <div className="footer-simple-brand-block">
-              <a className="footer-simple-brand" href="#home" aria-label="Image to Prompt brand">
+              <a className="footer-simple-brand" href="/#home" aria-label="Image to Prompt brand">
                 <BrandMarkIcon className="footer-simple-mark" />
                 <span className="footer-simple-brand-text">
                   <span className="footer-simple-brand-main">Image to Prompt</span>
                   <span className="footer-simple-brand-sub">AI Image Prompt Generator</span>
                 </span>
               </a>
-              <p className="footer-simple-tagline">
-                Turn any image into AI-ready prompts for ChatGPT, Gemini, Grok, Leonardo, and more.
-              </p>
             </div>
 
             <div className="footer-newsletter" id="newsletter">
@@ -3059,37 +3399,79 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
           </div>
 
           <div className="footer-simple-top">
-            <nav className="footer-simple-links" aria-label="Product and tool pages">
-              <a href="#home">Image to Prompt</a>
-              <a href="/image-to-prompt-converter">Image to Prompt Converter</a>
-              <a href="/image-prompt-generator">Image Prompt Generator</a>
-              <a href="/gemini-ai-photo-prompt">Gemini AI Photo Prompt</a>
-              <a href="/ai-gemini-photo-prompt">AI Gemini Photo Prompt</a>
-              <a href="/google-gemini-ai-photo-prompt">Google Gemini AI Photo Prompt</a>
-              <a href="/gemini-prompt">Gemini Prompt</a>
-              <a href="/bulk">Bulk Image to Prompt</a>
-              <a href="/pricing">Pricing</a>
-              <a href="/chrome-extension">Chrome Extension</a>
-              <a href="/faqs">FAQs</a>
-              <a href="/contact">Contact</a>
-              <a href="mailto:abhi@argro.co?subject=I%20need%20help%20for%20Image%20to%20Prompt">Help Center</a>
-            </nav>
+            <div className="footer-simple-links-grid" aria-label="Footer links">
+              <nav className="footer-simple-link-col" aria-label="Product">
+                <p className="footer-simple-link-heading">Product</p>
+                <div className="footer-simple-links">
+                  <a href="/#home">Image to Prompt</a>
+                  <a href="/image-to-prompt-converter">Image to Prompt Converter</a>
+                  <a href="/image-prompt-generator">Image Prompt Generator</a>
+                  <a href="/bulk">Bulk Image to Prompt</a>
+                  <a href="/pricing">Pricing</a>
+                </div>
+              </nav>
+
+              <nav className="footer-simple-link-col" aria-label="AI Tools">
+                <p className="footer-simple-link-heading">AI Tools</p>
+                <div className="footer-simple-links">
+                  <a href="/gemini-ai-photo-prompt">Gemini AI Photo Prompt</a>
+                  <a href="/ai-gemini-photo-prompt">AI Gemini Photo Prompt</a>
+                  <a href="/google-gemini-ai-photo-prompt">Google Gemini AI Photo Prompt</a>
+                  <a href="/gemini-prompt">Gemini Prompt</a>
+                  <a href="/chrome-extension">Chrome Extension</a>
+                </div>
+              </nav>
+
+              <nav className="footer-simple-link-col" aria-label="AI Model Pages">
+                <p className="footer-simple-link-heading">AI Model Pages</p>
+                <div className="footer-simple-links">
+                  <a href="/chatgpt-image-to-prompt">ChatGPT Image to Prompt</a>
+                  <a href="/copilot-image-to-prompt">Copilot Image to Prompt</a>
+                  <a href="/meta-ai-image-to-prompt">Meta AI Image to Prompt</a>
+                  <a href="/grok-image-to-prompt">Grok Image to Prompt</a>
+                  <a href="/leonardo-image-to-prompt">Leonardo Image to Prompt</a>
+                  <a href="/midjourney-image-to-prompt">Midjourney Image to Prompt</a>
+                </div>
+              </nav>
+
+              <nav className="footer-simple-link-col" aria-label="Style prompt conversions">
+                <p className="footer-simple-link-heading">Style Prompt Conversions</p>
+                <div className="footer-simple-links">
+                  <a href="/photo-to-anime-prompt">Photo to Anime Prompt</a>
+                  <a href="/portrait-to-realism-prompt">Portrait to Realism Prompt</a>
+                  <a href="/image-to-ghibli-style-prompt">Image to Ghibli Style Prompt</a>
+                  <a href="/photo-to-cinematic-prompt">Photo to Cinematic Prompt</a>
+                  <a href="/sketch-to-architecture-prompt">Sketch to Architecture Prompt</a>
+                  <a href="/image-to-3d-game-prompt">Image to 3D Game Prompt</a>
+                  <a href="/photo-to-cyberpunk-prompt">Photo to Cyberpunk Prompt</a>
+                  <a href="/image-to-fine-art-prompt">Image to Fine Art Prompt</a>
+                </div>
+              </nav>
+
+              <nav className="footer-simple-link-col" aria-label="Company">
+                <p className="footer-simple-link-heading">Company</p>
+                <div className="footer-simple-links">
+                  <a href="/faqs">FAQs</a>
+                  <a href="/contact">Contact</a>
+                  <a href="/about">About</a>
+                  <a href="/security">Security</a>
+                  <a href="/accessibility">Accessibility</a>
+                </div>
+              </nav>
+
+              <nav className="footer-simple-link-col" aria-label="Legal and Support">
+                <p className="footer-simple-link-heading">Legal and Support</p>
+                <div className="footer-simple-links">
+                  <a href="/privacy">Privacy Policy</a>
+                  <a href="/terms">Terms of Service</a>
+                  <a href="/cookies">Cookie Settings</a>
+                  <a href="mailto:imagetopromptgenerate@gmail.com?subject=I%20need%20help%20for%20Image%20to%20Prompt">Help Center</a>
+                </div>
+              </nav>
+            </div>
           </div>
 
           <div className="footer-simple-divider" />
-
-          <div className="footer-simple-bottom">
-            <nav className="footer-simple-links" aria-label="Company">
-              <a href="/about">About</a>
-            </nav>
-            <nav className="footer-simple-links footer-simple-links-right" aria-label="Legal and policies">
-              <a href="/privacy">Privacy Policy</a>
-              <a href="/terms">Terms of Service</a>
-              <a href="/cookies">Cookie Settings</a>
-              <a href="/accessibility">Accessibility</a>
-              <a href="/security">Security</a>
-            </nav>
-          </div>
 
           <div className="footer-simple-copy">
             <p>
@@ -3103,8 +3485,10 @@ export function ImageAnalyserLanding({ variant = "image-to-prompt" }: ImageAnaly
             </p>
           </div>
 
-          <div className="footer-simple-legal">
-            <p>© 2026 Image to Prompt Generator. All rights reserved.</p>
+          <div className="footer-simple-legal-row">
+            <div className="footer-simple-legal">
+              <p>© 2026 Image to Prompt Generator. All rights reserved.</p>
+            </div>
           </div>
         </div>
       </footer>
@@ -3269,6 +3653,35 @@ function normalizePricingPlanSnapshot(value: Partial<PricingPlanSnapshot> | unde
   };
 }
 
+function normalizePricingTopupSnapshot(
+  value: Partial<PricingTopupSnapshot> | undefined
+): PricingTopupSnapshot | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const code = typeof value.code === "string" ? value.code.trim().toLowerCase() : "";
+  const credits = normalizeInteger(value.credits);
+  const amountSubunits = normalizeInteger(value.amountSubunits);
+  const pricePerCreditSubunits = normalizeInteger(value.pricePerCreditSubunits);
+  const currency =
+    typeof value.currency === "string" && /^[A-Za-z]{3}$/.test(value.currency.trim())
+      ? value.currency.trim().toUpperCase()
+      : "";
+
+  if (!code || credits === null || amountSubunits === null || pricePerCreditSubunits === null || !currency) {
+    return null;
+  }
+
+  return {
+    code,
+    credits: Math.max(1, credits),
+    amountSubunits: Math.max(1, amountSubunits),
+    pricePerCreditSubunits: Math.max(1, pricePerCreditSubunits),
+    currency
+  };
+}
+
 function normalizePricingContextSnapshot(
   value: Partial<PricingContextSnapshot> | undefined
 ): PricingContextSnapshot | null {
@@ -3284,6 +3697,9 @@ function normalizePricingContextSnapshot(
   const plans = Array.isArray(value.plans)
     ? value.plans.map(normalizePricingPlanSnapshot).filter((entry): entry is PricingPlanSnapshot => Boolean(entry))
     : [];
+  const topups = Array.isArray(value.topups)
+    ? value.topups.map(normalizePricingTopupSnapshot).filter((entry): entry is PricingTopupSnapshot => Boolean(entry))
+    : [];
 
   if (!currency || plans.length === 0) {
     return null;
@@ -3292,7 +3708,8 @@ function normalizePricingContextSnapshot(
   return {
     country,
     currency,
-    plans
+    plans,
+    topups
   };
 }
 

@@ -1,10 +1,11 @@
 # Image Analyser
 
-Clean two-part setup:
+Clean multi-part setup:
 
 - `extension/` Chrome extension (image click + UI)
 - `backend/` Node API (OpenAI vision call)
 - `web/` Next.js website (landing page + upload + prompt flow)
+- `mobile/` Expo React Native app (minimal app UI for tools)
 
 ## Directory Layout
 
@@ -21,6 +22,12 @@ Image Analyser/
 ├── web/
 │   ├── app/
 │   ├── public/
+│   ├── package.json
+│   └── .env.example
+├── mobile/
+│   ├── app/
+│   ├── src/
+│   ├── assets/
 │   ├── package.json
 │   └── .env.example
 └── backend/
@@ -63,6 +70,21 @@ Optional:
 - `TOKEN_TTL_SECONDS=2592000` (minimum enforced to 7 days)
 - `GUEST_KEY_SALT=...`
 - `GOOGLE_CLIENT_ID=...` (required only for Google login)
+- `BLOCK_DISPOSABLE_EMAILS=true` (block temp/disposable email domains)
+- `SIGNUP_MIN_FORM_FILL_MS=1500` (bot-check minimum signup fill time)
+- `SIGNUP_MAX_FORM_AGE_MS=43200000` (bot-check maximum signup form age)
+- `AUTH_RATE_LIMIT_WINDOW_MS=600000`
+- `AUTH_SIGNUP_MAX_ATTEMPTS_PER_IP=8`
+- `AUTH_SIGNUP_MAX_ATTEMPTS_PER_EMAIL=4`
+- `AUTH_SIGNIN_MAX_ATTEMPTS_PER_IP=30`
+- `AUTH_SIGNIN_MAX_ATTEMPTS_PER_EMAIL=12`
+- `AUTH_GOOGLE_MAX_ATTEMPTS_PER_IP=25`
+- `AUTH_GOOGLE_MAX_ATTEMPTS_PER_EMAIL=10`
+- `AUTH_ENFORCE_EMAIL_DNS=true` (verify MX/A/AAAA records on signup)
+- `AUTH_EMAIL_DNS_FAIL_OPEN=false` (if DNS lookup fails, reject instead of allowing)
+- `AUTH_EMAIL_DNS_TIMEOUT_MS=3000`
+- `AUTH_EMAIL_DNS_CACHE_SUCCESS_MS=21600000`
+- `AUTH_EMAIL_DNS_CACHE_FAILURE_MS=1200000`
 - `BASE_PATH=/backend` (optional, when reverse-proxying backend under a path)
 
 Razorpay billing (required for paid checkout):
@@ -76,10 +98,14 @@ Optional Razorpay billing values:
 - `RAZORPAY_API_BASE=https://api.razorpay.com/v1`
 - `RAZORPAY_WEBHOOK_SECRET=...`
 - `RAZORPAY_CURRENCY=USD`
+- `MODEL_COST_USD_CENTS_PER_PROMPT=2`
+- `PROMPT_PRICE_MULTIPLIER=5`
+- `FREE_MONTHLY_PROMPT_QUOTA=20`
+- `PRO_MONTHLY_PROMPT_QUOTA=200`
 - `RAZORPAY_PRO_AMOUNT_SUBUNITS=2000`
-- `RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS=6000`
 - `RAZORPAY_PRO_ANNUAL_AMOUNT_SUBUNITS=19200`
-- `RAZORPAY_UNLIMITED_ANNUAL_AMOUNT_SUBUNITS=57600`
+- `RAZORPAY_UNLIMITED_AMOUNT_SUBUNITS=6000` (legacy only)
+- `RAZORPAY_UNLIMITED_ANNUAL_AMOUNT_SUBUNITS=57600` (legacy only)
 
 The backend auto-applies `backend/schema.sql` on startup.
 
@@ -125,6 +151,19 @@ Local backend example: `http://127.0.0.1:8787`
 
 After signing in on web, generate a prompt, click **Save** in the result modal, then open the profile dropdown (top-right) and click **Saved prompts** to open the dedicated saved-prompts page.
 
+### 5. Run the mobile app (Expo)
+
+```bash
+cd /Users/abhisheksingh/Desktop/Image\ Analyser/mobile
+cp .env.example .env
+# set EXPO_PUBLIC_BACKEND_URL only if different from default
+npm install
+npm run start
+```
+
+Mobile app backend default URL: `https://img.connectiqworld.cloud/backend`  
+Local backend example: `http://127.0.0.1:8787`
+
 ## Deploy Backend on VPS
 
 1. Deploy only the `backend/` folder.
@@ -148,8 +187,10 @@ After signing in on web, generate a prompt, click **Save** in the result modal, 
 - `GET /api/prompts/saved` (auth, list saved generated prompts)
 - `POST /api/prompts/saved` (auth, save generated prompt manually)
 - `POST /api/subscription/plan` (self plan change)
-- `POST /api/billing/checkout-session` (auth, paid plans, supports `billingCycle: monthly|annual`)
+- `POST /api/billing/checkout-session` (auth, paid plan checkout for Pro, supports `billingCycle: monthly|annual`)
 - `POST /api/billing/verify-payment` (auth, Razorpay signature verify)
+- `POST /api/billing/topup/checkout-session` (auth, one-time top-up credits checkout)
+- `POST /api/billing/topup/verify-payment` (auth, top-up payment verify + credit grant)
 - `POST /api/billing/portal-session` (auth)
 - `POST /api/billing/webhook` (Razorpay webhook, optional)
 - `GET /api/admin/users` (admin+)
@@ -175,7 +216,7 @@ Request body:
 - Guest: `20` monthly uses (configurable)
 - Free: `20` monthly uses
 - Pro: `200` monthly uses
-- Unlimited: no monthly cap
+- Top-up credits: add extra monthly credits via one-time purchase
 
 Prompts are only saved when user explicitly calls `POST /api/prompts/saved` (web save button / extension save icon).
 

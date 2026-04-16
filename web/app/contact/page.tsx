@@ -58,7 +58,7 @@ export default function ContactPage() {
               <h2>Email us</h2>
               <p>
                 For support, billing, or general inquiries, email us at{" "}
-                <a href="mailto:abhi@argro.co">abhi@argro.co</a>. We aim to respond within a few business days.
+                <a href="mailto:imagetopromptgenerate@gmail.com">imagetopromptgenerate@gmail.com</a>. We aim to respond within a few business days.
               </p>
               <h2 className="contact-info-section">What to include</h2>
               <ul>

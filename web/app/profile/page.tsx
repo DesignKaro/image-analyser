@@ -8,12 +8,14 @@ import {
   BillingCycle,
   PricingContextSnapshot,
   PricingPlanSnapshot,
+  PricingTopupSnapshot,
   SubscriptionSnapshot,
   UsageSnapshot,
   UserPlanCode,
   UserSnapshot
 } from "../lib/saas-types";
 import { ArrowRightIcon, BrandMarkIcon } from "../ui/icons";
+import { SiteFooter } from "../ui/site-footer";
 
 type ApiResponse = {
   ok?: boolean;
@@ -26,7 +28,13 @@ type ApiResponse = {
   amount?: number;
   currency?: string;
   billingCycle?: BillingCycle;
+  topupCode?: string;
+  credits?: number;
   message?: string;
+  topup?: {
+    code?: string;
+    credits?: number;
+  };
   prefill?: {
     email?: string;
   };
@@ -105,6 +113,14 @@ export default function ProfilePage() {
       };
     });
   }, [pricingByPlanCode, resolvedPricingContext.currency]);
+  const topupOptions = useMemo(() => {
+    return Array.isArray(resolvedPricingContext.topups)
+      ? resolvedPricingContext.topups
+          .map(normalizePricingTopupSnapshot)
+          .filter((entry): entry is PricingTopupSnapshot => Boolean(entry))
+          .sort((a, b) => a.credits - b.credits)
+      : [];
+  }, [resolvedPricingContext.topups]);
 
   const clearSession = useCallback((nextMessage = "") => {
     window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
@@ -399,6 +415,106 @@ export default function ProfilePage() {
     }
   }
 
+  async function onPurchaseTopup(topupCode: string) {
+    if (!authToken || !topupCode) {
+      return;
+    }
+
+    setPlanSubmitting(true);
+    setBillingRedirecting(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(`${backendUrl}/api/billing/topup/checkout-session`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          topupCode
+        })
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as ApiResponse;
+      if (
+        !response.ok ||
+        !payload.ok ||
+        !payload.orderId ||
+        !payload.keyId ||
+        !Number.isFinite(payload.amount) ||
+        !payload.currency
+      ) {
+        throw new Error(payload.error || "Could not start top-up checkout.");
+      }
+
+      const Razorpay = await ensureRazorpayLoaded();
+      await new Promise<void>((resolve, reject) => {
+        let completed = false;
+        const checkout = new Razorpay({
+          key: payload.keyId || "",
+          amount: Number(payload.amount),
+          currency: payload.currency || "USD",
+          name: "Image to Prompt",
+          description: payload.description || "Add credits",
+          order_id: payload.orderId || "",
+          prefill: {
+            email: payload.prefill?.email || user?.email || ""
+          },
+          theme: {
+            color: "#2d6ae3"
+          },
+          modal: {
+            ondismiss: () => {
+              if (!completed) {
+                reject(new Error("Payment canceled."));
+              }
+            }
+          },
+          handler: async (checkoutPayload: RazorpayHandlerPayload) => {
+            try {
+              const verifyResponse = await fetch(`${backendUrl}/api/billing/topup/verify-payment`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${authToken}`
+                },
+                body: JSON.stringify(checkoutPayload)
+              });
+
+              const verifyPayload = (await verifyResponse.json().catch(() => ({}))) as ApiResponse;
+              if (!verifyResponse.ok || !verifyPayload.ok) {
+                throw new Error(verifyPayload.error || "Payment verification failed.");
+              }
+
+              completed = true;
+              applySessionPayload(verifyPayload);
+              const creditsAdded = Number(verifyPayload.topup?.credits ?? payload.credits ?? 0);
+              setMessage(
+                Number.isFinite(creditsAdded) && creditsAdded > 0
+                  ? `${Math.round(creditsAdded)} credits added successfully.`
+                  : "Credits added successfully."
+              );
+              resolve();
+            } catch (verifyError) {
+              const nextError =
+                verifyError instanceof Error ? verifyError.message : "Payment verification failed.";
+              reject(new Error(nextError));
+            }
+          }
+        });
+        checkout.open();
+      });
+    } catch (topupError) {
+      const nextError = topupError instanceof Error ? topupError.message : "Could not add credits.";
+      setError(nextError);
+    } finally {
+      setBillingRedirecting(false);
+      setPlanSubmitting(false);
+    }
+  }
+
   async function onOpenBillingPortal() {
     if (!authToken) {
       return;
@@ -541,6 +657,25 @@ export default function ProfilePage() {
                     </button>
                   ))}
                 </div>
+                {topupOptions.length > 0 ? (
+                  <>
+                    <h3 className="profile-topup-title">Add credits</h3>
+                    <div className="profile-topup-row">
+                      {topupOptions.map((topup) => (
+                        <button
+                          key={topup.code}
+                          type="button"
+                          className="profile-topup-btn"
+                          disabled={planSubmitting || billingRedirecting}
+                          onClick={() => void onPurchaseTopup(topup.code)}
+                        >
+                          <span>{topup.credits} credits</span>
+                          <span>{formatCurrencySubunits(topup.amountSubunits, resolvedPricingContext.currency)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : null}
 
                 <div className="profile-actions">
                   <button
@@ -572,66 +707,7 @@ export default function ProfilePage() {
         </section>
       </main>
 
-      <footer className="footer footer-simple">
-        <div className="container footer-simple-inner">
-          <div className="footer-simple-head">
-            <div className="footer-simple-brand-block">
-              <Link className="footer-simple-brand" href="/" aria-label="Image to Prompt brand">
-                <BrandMarkIcon className="footer-simple-mark" />
-                <span className="footer-simple-brand-text">
-                  <span className="footer-simple-brand-main">Image to Prompt</span>
-                  <span className="footer-simple-brand-sub">AI Image Prompt Generator</span>
-                </span>
-              </Link>
-              <p className="footer-simple-tagline">
-                Turn any image into AI-ready prompts for ChatGPT, Gemini, Grok, Leonardo, and more.
-              </p>
-            </div>
-          </div>
-
-          <div className="footer-simple-top">
-            <nav className="footer-simple-links" aria-label="Product and tool pages">
-              <Link href="/">Image to Prompt</Link>
-              <Link href="/image-to-prompt-converter">Image to Prompt Converter</Link>
-              <Link href="/image-prompt-generator">Image Prompt Generator</Link>
-              <Link href="/gemini-ai-photo-prompt">Gemini AI Photo Prompt</Link>
-              <Link href="/ai-gemini-photo-prompt">AI Gemini Photo Prompt</Link>
-              <Link href="/google-gemini-ai-photo-prompt">Google Gemini AI Photo Prompt</Link>
-              <Link href="/gemini-prompt">Gemini Prompt</Link>
-              <Link href="/bulk">Bulk Image to Prompt</Link>
-              <Link href="/pricing">Pricing</Link>
-              <Link href="/chrome-extension">Chrome Extension</Link>
-              <Link href="mailto:abhi@argro.co?subject=I%20need%20help%20for%20Image%20to%20Prompt">Help Center</Link>
-            </nav>
-          </div>
-
-          <div className="footer-simple-divider" />
-
-          <div className="footer-simple-bottom">
-            <nav className="footer-simple-links" aria-label="Company">
-              <Link href="/about">About</Link>
-            </nav>
-            <nav className="footer-simple-links footer-simple-links-right" aria-label="Legal and policies">
-              <Link href="/privacy">Privacy Policy</Link>
-              <Link href="/terms">Terms of Service</Link>
-              <Link href="/cookies">Cookie Settings</Link>
-              <Link href="/accessibility">Accessibility</Link>
-              <Link href="/security">Security</Link>
-            </nav>
-          </div>
-
-          <div className="footer-simple-copy">
-            <p>
-              Image to Prompt Generator helps creators and teams turn visuals into structured prompts. Upload an
-              image and get AI-ready text for ChatGPT, Gemini, Grok, Leonardo, and more.
-            </p>
-          </div>
-
-          <div className="footer-simple-legal">
-            <p>© 2026 Image to Prompt. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter id="profile-footer" />
     </div>
   );
 }
@@ -756,6 +832,35 @@ function normalizePricingPlanSnapshot(value: Partial<PricingPlanSnapshot> | unde
   };
 }
 
+function normalizePricingTopupSnapshot(
+  value: Partial<PricingTopupSnapshot> | undefined
+): PricingTopupSnapshot | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const code = typeof value.code === "string" ? value.code.trim().toLowerCase() : "";
+  const credits = normalizeInteger(value.credits);
+  const amountSubunits = normalizeInteger(value.amountSubunits);
+  const pricePerCreditSubunits = normalizeInteger(value.pricePerCreditSubunits);
+  const currency =
+    typeof value.currency === "string" && /^[A-Za-z]{3}$/.test(value.currency.trim())
+      ? value.currency.trim().toUpperCase()
+      : "";
+
+  if (!code || credits === null || amountSubunits === null || pricePerCreditSubunits === null || !currency) {
+    return null;
+  }
+
+  return {
+    code,
+    credits: Math.max(1, credits),
+    amountSubunits: Math.max(1, amountSubunits),
+    pricePerCreditSubunits: Math.max(1, pricePerCreditSubunits),
+    currency
+  };
+}
+
 function normalizePricingContextSnapshot(
   value: Partial<PricingContextSnapshot> | undefined
 ): PricingContextSnapshot | null {
@@ -771,6 +876,9 @@ function normalizePricingContextSnapshot(
   const plans = Array.isArray(value.plans)
     ? value.plans.map(normalizePricingPlanSnapshot).filter((entry): entry is PricingPlanSnapshot => Boolean(entry))
     : [];
+  const topups = Array.isArray(value.topups)
+    ? value.topups.map(normalizePricingTopupSnapshot).filter((entry): entry is PricingTopupSnapshot => Boolean(entry))
+    : [];
 
   if (!currency || plans.length === 0) {
     return null;
@@ -779,7 +887,8 @@ function normalizePricingContextSnapshot(
   return {
     country,
     currency,
-    plans
+    plans,
+    topups
   };
 }
 

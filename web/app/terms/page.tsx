@@ -61,7 +61,7 @@ const sections: LegalSection[] = [
   },
   {
     title: "Contact",
-    paragraphs: ["Questions regarding these terms can be sent to abhi@argro.co."]
+    paragraphs: ["Questions regarding these terms can be sent to imagetopromptgenerate@gmail.com."]
   }
 ];
 

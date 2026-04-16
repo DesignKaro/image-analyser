@@ -92,7 +92,7 @@ export function LegalPageShell({ eyebrow, title, subtitle, lastUpdated, sections
               <div className="legal-contact">
                 <h3>Need help?</h3>
                 <p>
-                  Email us at <a href="mailto:abhi@argro.co">abhi@argro.co</a> for support, compliance, or account
+                  Email us at <a href="mailto:imagetopromptgenerate@gmail.com">imagetopromptgenerate@gmail.com</a> for support, compliance, or account
                   requests.
                 </p>
               </div>

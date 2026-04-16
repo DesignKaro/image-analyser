@@ -12,7 +12,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/gemini-ai-photo-prompt",
     "/ai-gemini-photo-prompt",
     "/google-gemini-ai-photo-prompt",
-    "/gemini-prompt"
+    "/gemini-prompt",
+    "/chatgpt-image-to-prompt",
+    "/copilot-image-to-prompt",
+    "/meta-ai-image-to-prompt",
+    "/grok-image-to-prompt",
+    "/leonardo-image-to-prompt",
+    "/midjourney-image-to-prompt"
   ];
 
   const toolPages = [

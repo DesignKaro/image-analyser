@@ -11,6 +11,16 @@ CREATE TABLE IF NOT EXISTS users (
   UNIQUE KEY uq_users_email (email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS signup_ip_registrations (
+  ip_hash CHAR(64) NOT NULL,
+  successful_registrations INT NOT NULL DEFAULT 0,
+  first_registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  last_registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (ip_hash)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS subscriptions (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   user_id BIGINT UNSIGNED NOT NULL,
@@ -134,4 +144,25 @@ CREATE TABLE IF NOT EXISTS billing_orders (
   UNIQUE KEY uq_billing_orders_order (razorpay_order_id),
   KEY idx_billing_orders_user (user_id, created_at),
   CONSTRAINT fk_billing_orders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS credit_topup_orders (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  razorpay_order_id VARCHAR(191) NOT NULL,
+  user_id BIGINT UNSIGNED NOT NULL,
+  topup_code VARCHAR(64) NOT NULL,
+  credits INT NOT NULL,
+  period_key CHAR(7) NOT NULL,
+  amount_subunits INT NOT NULL,
+  currency VARCHAR(8) NOT NULL,
+  status ENUM('created','paid','failed') NOT NULL DEFAULT 'created',
+  razorpay_payment_id VARCHAR(191) NULL,
+  razorpay_signature VARCHAR(191) NULL,
+  payload_json JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_credit_topup_orders_order (razorpay_order_id),
+  KEY idx_credit_topup_orders_user_period_status (user_id, period_key, status, created_at),
+  CONSTRAINT fk_credit_topup_orders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

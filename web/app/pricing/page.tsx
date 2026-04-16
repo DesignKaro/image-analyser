@@ -2,14 +2,41 @@
 
 import Link from "next/link";
 import { CSSProperties, useEffect, useMemo, useState } from "react";
-import { SHRINK_DISTANCE, resolveBackendUrl } from "../lib/client-config";
+import { AUTH_TOKEN_STORAGE_KEY, SHRINK_DISTANCE, resolveBackendUrl } from "../lib/client-config";
 import {
   DEFAULT_PRICING_CONTEXT,
   PRICING_CARDS,
   formatCurrencySubunits
 } from "../lib/pricing";
-import type { PricingContextSnapshot, UserPlanCode } from "../lib/saas-types";
+import type { PricingContextSnapshot, PricingTopupSnapshot, UserPlanCode, UsageSnapshot } from "../lib/saas-types";
 import { BrandMarkIcon, CheckIcon } from "../ui/icons";
+import { SiteFooter } from "../ui/site-footer";
+
+function normalizeUsageSnapshot(value: Partial<UsageSnapshot> | undefined): UsageSnapshot | null {
+  if (!value || typeof value !== "object") return null;
+  const periodKey = typeof value.periodKey === "string" ? value.periodKey.trim() : "";
+  const used = Number.isFinite(Number(value.used)) ? Number(value.used) : NaN;
+  const limitRaw = value.limit;
+  const remainingRaw = value.remaining;
+  const limit = limitRaw === null ? null : Number.isFinite(Number(limitRaw)) ? Number(limitRaw) : NaN;
+  const remaining = remainingRaw === null ? null : Number.isFinite(Number(remainingRaw)) ? Number(remainingRaw) : NaN;
+  if (!periodKey || !Number.isFinite(used)) return null;
+  if (limit !== null && !Number.isFinite(limit)) return null;
+  if (remaining !== null && !Number.isFinite(remaining)) return null;
+  return {
+    periodKey,
+    used: Math.max(0, used),
+    limit: limit === null ? null : Math.max(0, limit),
+    remaining: remaining === null ? null : Math.max(0, remaining)
+  };
+}
+
+function formatUsageLine(usage: UsageSnapshot | null): string {
+  if (!usage) return "Usage";
+  if (usage.limit === null) return `${usage.used} used • Unlimited`;
+  const remaining = usage.remaining ?? Math.max(0, usage.limit - usage.used);
+  return `${usage.used}/${usage.limit} used • ${remaining} left`;
+}
 
 function normalizePricingContext(value: unknown): PricingContextSnapshot | null {
   if (!value || typeof value !== "object") return null;
@@ -39,18 +66,45 @@ function normalizePricingContext(value: unknown): PricingContextSnapshot | null 
       };
     })
     .filter((p): p is NonNullable<typeof p> => p !== null);
+  const topups = Array.isArray(v.topups) ? v.topups : [];
+  const normalizedTopups = topups
+    .filter((p): p is Record<string, unknown> => p && typeof p === "object")
+    .map((p) => {
+      const code = typeof p.code === "string" ? p.code.trim().toLowerCase() : "";
+      const credits = Number(p.credits);
+      const amount = Number(p.amountSubunits);
+      const perCredit = Number(p.pricePerCreditSubunits);
+      const topupCurrency =
+        typeof p.currency === "string" && /^[A-Za-z]{3}$/.test(p.currency.trim())
+          ? p.currency.trim().toUpperCase()
+          : currency;
+      if (!code || !Number.isFinite(credits) || !Number.isFinite(amount) || !Number.isFinite(perCredit) || !topupCurrency) {
+        return null;
+      }
+      return {
+        code,
+        credits: Math.max(1, Math.round(credits)),
+        amountSubunits: Math.max(1, Math.round(amount)),
+        pricePerCreditSubunits: Math.max(1, Math.round(perCredit)),
+        currency: topupCurrency
+      } satisfies PricingTopupSnapshot;
+    })
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+    .sort((a, b) => a.credits - b.credits);
   if (!currency || normalizedPlans.length === 0) return null;
-  return { country, currency, plans: normalizedPlans };
+  return { country, currency, plans: normalizedPlans, topups: normalizedTopups };
 }
 
 export default function PricingPage() {
   const [billingAnnual, setBillingAnnual] = useState(false);
   const [pricingContext, setPricingContext] = useState<PricingContextSnapshot | null>(null);
   const [headerScrollProgress, setHeaderScrollProgress] = useState(0);
-  const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [newsletterMessage, setNewsletterMessage] = useState("");
+  const [authToken, setAuthToken] = useState("");
+  const [user, setUser] = useState<{ id?: number; email?: string } | null>(null);
+  const [usage, setUsage] = useState<UsageSnapshot | null>(null);
 
   const backendUrl = useMemo(() => resolveBackendUrl(), []);
+  const usageLine = useMemo(() => formatUsageLine(usage), [usage]);
   const resolvedPricingContext = pricingContext || DEFAULT_PRICING_CONTEXT;
   const pricingByPlanCode = useMemo(() => {
     const out: Partial<Record<UserPlanCode, (typeof resolvedPricingContext.plans)[number]>> = {};
@@ -59,6 +113,41 @@ export default function PricingPage() {
     }
     return out;
   }, [resolvedPricingContext]);
+  const topupOptions = useMemo(() => {
+    return Array.isArray(resolvedPricingContext.topups)
+      ? resolvedPricingContext.topups.slice().sort((a, b) => a.credits - b.credits)
+      : [];
+  }, [resolvedPricingContext.topups]);
+
+  useEffect(() => {
+    const token = typeof window !== "undefined" ? window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) : null;
+    setAuthToken(token || "");
+  }, []);
+
+  useEffect(() => {
+    if (!authToken || !backendUrl) return;
+    const controller = new AbortController();
+    fetch(`${backendUrl}/api/me`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${authToken}` },
+      signal: controller.signal
+    })
+      .then((res) => res.json())
+      .then((data: { ok?: boolean; user?: unknown; usage?: unknown; error?: string }) => {
+        if (!data?.ok) {
+          window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+          setAuthToken("");
+          setUser(null);
+          setUsage(null);
+          return;
+        }
+        setUser((data.user && typeof data.user === "object") ? (data.user as { id?: number; email?: string }) : null);
+        const nextUsage = normalizeUsageSnapshot(data.usage as Partial<UsageSnapshot> | undefined);
+        setUsage(nextUsage);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [authToken, backendUrl]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -91,13 +180,6 @@ export default function PricingPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  function onSubscribeNewsletter(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!newsletterEmail.trim()) return;
-    setNewsletterMessage("Subscribed. Thank you for joining our newsletter.");
-    setNewsletterEmail("");
-  }
-
   return (
     <div className="site-shell pricing-page" data-nav-scrolled={headerScrollProgress > 0.08 ? "" : undefined}>
       <header
@@ -119,12 +201,23 @@ export default function PricingPage() {
           </nav>
 
           <div className="nav-auth">
-            <Link href="/" className="nav-login nav-login-btn">
-              Log in
-            </Link>
-            <Link href="/" className="nav-signup">
-              Sign up
-            </Link>
+            {user ? (
+              <>
+                <span className="nav-usage-pill" title={usageLine}>{usageLine}</span>
+                <Link className="nav-login" href="/profile">
+                  Profile
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/" className="nav-login nav-login-btn">
+                  Log in
+                </Link>
+                <Link href="/" className="nav-signup">
+                  Sign up
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -199,93 +292,47 @@ export default function PricingPage() {
               );
             })}
           </div>
+          {topupOptions.length > 0 ? (
+            <div className="pricing-topup-wrap">
+              <div className="pricing-topup-head">
+                <h2>Add more credits</h2>
+                <p>Need more prompts? Buy top-up credits anytime after signup.</p>
+              </div>
+              <div className="pricing-topup-table-wrap">
+                <table className="pricing-topup-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Credits</th>
+                      <th scope="col">Cost</th>
+                      <th scope="col">Price / credit</th>
+                      <th scope="col" aria-label="Action" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topupOptions.map((topup) => (
+                      <tr key={topup.code}>
+                        <td>{topup.credits.toLocaleString()}</td>
+                        <td>{formatCurrencySubunits(topup.amountSubunits, resolvedPricingContext.currency)}</td>
+                        <td>{formatCurrencySubunits(topup.pricePerCreditSubunits, resolvedPricingContext.currency)}</td>
+                        <td>
+                          <Link href="/" className="pricing-topup-buy-link">
+                            Get started
+                          </Link>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ) : null}
           <p className="pricing-signin-note">
             Already have an account? <Link href="/">Sign in</Link> to manage your plan.
           </p>
         </section>
       </main>
 
-      <footer className="footer footer-simple" id="pricing-footer">
-        <div className="container footer-simple-inner">
-          <div className="footer-simple-head">
-            <div className="footer-simple-brand-block">
-              <Link className="footer-simple-brand" href="/" aria-label="Image to Prompt brand">
-                <BrandMarkIcon className="footer-simple-mark" />
-                <span className="footer-simple-brand-text">
-                  <span className="footer-simple-brand-main">Image to Prompt</span>
-                  <span className="footer-simple-brand-sub">AI Image Prompt Generator</span>
-                </span>
-              </Link>
-              <p className="footer-simple-tagline">
-                Turn any image into AI-ready prompts for ChatGPT, Gemini, Grok, Leonardo, and more.
-              </p>
-            </div>
-
-            <div className="footer-newsletter" id="newsletter">
-              <p className="footer-newsletter-title">Subscribe to our newsletter</p>
-              <form className="footer-newsletter-form" onSubmit={onSubscribeNewsletter}>
-                <input
-                  type="email"
-                  value={newsletterEmail}
-                  onChange={(e) => setNewsletterEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  autoComplete="email"
-                  required
-                />
-                <button type="submit">Subscribe</button>
-              </form>
-              {newsletterMessage ? <p className="footer-newsletter-note">{newsletterMessage}</p> : null}
-            </div>
-          </div>
-
-          <div className="footer-simple-top">
-            <nav className="footer-simple-links" aria-label="Product and tool pages">
-              <Link href="/">Image to Prompt</Link>
-              <Link href="/image-to-prompt-converter">Image to Prompt Converter</Link>
-              <Link href="/image-prompt-generator">Image Prompt Generator</Link>
-              <Link href="/gemini-ai-photo-prompt">Gemini AI Photo Prompt</Link>
-              <Link href="/ai-gemini-photo-prompt">AI Gemini Photo Prompt</Link>
-              <Link href="/google-gemini-ai-photo-prompt">Google Gemini AI Photo Prompt</Link>
-              <Link href="/gemini-prompt">Gemini Prompt</Link>
-              <Link href="/bulk">Bulk Image to Prompt</Link>
-              <Link href="/pricing">Pricing</Link>
-              <a href="/chrome-extension">Chrome Extension</a>
-              <a href="mailto:abhi@argro.co?subject=I%20need%20help%20for%20Image%20to%20Prompt">Help Center</a>
-            </nav>
-          </div>
-
-          <div className="footer-simple-divider" />
-
-          <div className="footer-simple-bottom">
-            <nav className="footer-simple-links" aria-label="Company">
-              <a href="/about">About</a>
-            </nav>
-            <nav className="footer-simple-links footer-simple-links-right" aria-label="Legal and policies">
-              <a href="/privacy">Privacy Policy</a>
-              <a href="/terms">Terms of Service</a>
-              <a href="/cookies">Cookie Settings</a>
-              <a href="/accessibility">Accessibility</a>
-              <a href="/security">Security</a>
-            </nav>
-          </div>
-
-          <div className="footer-simple-copy">
-            <p>
-              Image to Prompt Generator helps creators, marketers, and product teams turn visuals into structured
-              prompts faster. Upload one image and produce reusable text instructions optimized for modern AI models.
-            </p>
-            <p>
-              Use our image to prompt workflow to generate high-quality AI prompt from image inputs, streamline
-              creative iteration, and maintain consistent output quality across ChatGPT, Gemini, Grok, Leonardo, and
-              more.
-            </p>
-          </div>
-
-          <div className="footer-simple-legal">
-            <p>© 2026 Image to Prompt Generator. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter id="pricing-footer" />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { CSSProperties, useCallback, useEffect, useMemo, useState } from "react";
 import { AUTH_TOKEN_STORAGE_KEY, SHRINK_DISTANCE, resolveBackendUrl } from "../lib/client-config";
 import {
   BillingCycle,
@@ -13,6 +13,7 @@ import {
   UserStatus
 } from "../lib/saas-types";
 import { BrandMarkIcon } from "../ui/icons";
+import { SiteFooter } from "../ui/site-footer";
 
 type AdminTab = "overview" | "users" | "user-details" | "activity";
 
@@ -104,8 +105,6 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [headerScrollProgress, setHeaderScrollProgress] = useState(0);
-  const [newsletterEmail, setNewsletterEmail] = useState("");
-  const [newsletterMessage, setNewsletterMessage] = useState("");
   const [adminTab, setAdminTab] = useState<AdminTab>("overview");
 
   const backendUrl = useMemo(() => {
@@ -418,17 +417,6 @@ export default function AdminPage() {
     }
   }
 
-  function onSubscribeNewsletter(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const email = newsletterEmail.trim();
-    if (!email) {
-      setNewsletterMessage("Please enter an email address.");
-      return;
-    }
-    setNewsletterMessage("Subscribed. Thank you for joining our newsletter.");
-    setNewsletterEmail("");
-  }
-
   return (
     <div className="site-shell profile-page">
       <header
@@ -629,7 +617,6 @@ export default function AdminPage() {
                                       >
                                         <option value="free">Free</option>
                                         <option value="pro">Pro</option>
-                                        <option value="unlimited">Unlimited</option>
                                       </select>
                                     </td>
                                     <td>
@@ -797,87 +784,7 @@ export default function AdminPage() {
         </section>
       </main>
 
-      <footer className="footer footer-simple">
-        <div className="container footer-simple-inner">
-          <div className="footer-simple-head">
-            <div className="footer-simple-brand-block">
-              <Link className="footer-simple-brand" href="/" aria-label="Image to Prompt brand">
-                <BrandMarkIcon className="footer-simple-mark" />
-                <span className="footer-simple-brand-text">
-                  <span className="footer-simple-brand-main">Image to Prompt</span>
-                  <span className="footer-simple-brand-sub">AI Image Prompt Generator</span>
-                </span>
-              </Link>
-              <p className="footer-simple-tagline">
-                Turn any image into AI-ready prompts for ChatGPT, Gemini, Grok, Leonardo, and more.
-              </p>
-            </div>
-
-            <div className="footer-newsletter" id="newsletter">
-              <p className="footer-newsletter-title">Subscribe to our newsletter</p>
-              <form className="footer-newsletter-form" onSubmit={onSubscribeNewsletter}>
-                <input
-                  type="email"
-                  value={newsletterEmail}
-                  onChange={(e) => setNewsletterEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  autoComplete="email"
-                  required
-                />
-                <button type="submit">Subscribe</button>
-              </form>
-              {newsletterMessage ? <p className="footer-newsletter-note">{newsletterMessage}</p> : null}
-            </div>
-          </div>
-
-          <div className="footer-simple-top">
-            <nav className="footer-simple-links" aria-label="Product and tool pages">
-              <Link href="/">Image to Prompt</Link>
-              <Link href="/image-to-prompt-converter">Image to Prompt Converter</Link>
-              <Link href="/image-prompt-generator">Image Prompt Generator</Link>
-              <Link href="/gemini-ai-photo-prompt">Gemini AI Photo Prompt</Link>
-              <Link href="/ai-gemini-photo-prompt">AI Gemini Photo Prompt</Link>
-              <Link href="/google-gemini-ai-photo-prompt">Google Gemini AI Photo Prompt</Link>
-              <Link href="/gemini-prompt">Gemini Prompt</Link>
-              <Link href="/bulk">Bulk Image to Prompt</Link>
-              <Link href="/pricing">Pricing</Link>
-              <Link href="/chrome-extension">Chrome Extension</Link>
-              <Link href="mailto:abhi@argro.co?subject=I%20need%20help%20for%20Image%20to%20Prompt">Help Center</Link>
-            </nav>
-          </div>
-
-          <div className="footer-simple-divider" />
-
-          <div className="footer-simple-bottom">
-            <nav className="footer-simple-links" aria-label="Company">
-              <Link href="/about">About</Link>
-            </nav>
-            <nav className="footer-simple-links footer-simple-links-right" aria-label="Legal and policies">
-              <Link href="/privacy">Privacy Policy</Link>
-              <Link href="/terms">Terms of Service</Link>
-              <Link href="/cookies">Cookie Settings</Link>
-              <Link href="/accessibility">Accessibility</Link>
-              <Link href="/security">Security</Link>
-            </nav>
-          </div>
-
-          <div className="footer-simple-copy">
-            <p>
-              Image to Prompt Generator helps creators, marketers, and product teams turn visuals into structured
-              prompts faster. Upload one image and produce reusable text instructions optimized for modern AI models.
-            </p>
-            <p>
-              Use our image to prompt workflow to generate high-quality AI prompt from image inputs, streamline
-              creative iteration, and maintain consistent output quality across ChatGPT, Gemini, Grok, Leonardo, and
-              more.
-            </p>
-          </div>
-
-          <div className="footer-simple-legal">
-            <p>© 2026 Image to Prompt Generator. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <SiteFooter id="admin-footer" />
     </div>
   );
 }
@@ -1094,6 +1001,10 @@ function formatPlanLabel(value: unknown): string {
   if (value === "free") return "Free";
   if (value === "pro") return "Pro";
   if (value === "unlimited") return "Unlimited";
+  if (typeof value === "string" && value.startsWith("topup:")) {
+    const digits = value.replace(/\D+/g, "");
+    return digits ? `Top-up (${Number(digits).toLocaleString()} credits)` : "Top-up credits";
+  }
   return String(value || "-");
 }
 

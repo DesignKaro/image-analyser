@@ -5,21 +5,17 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   ArrowRightIcon,
-  ChromeIcon,
   FileTextIcon,
   ImageIcon,
-  PlayIcon,
-  SparkIcon,
   UploadIcon
 } from "../ui/icons";
+import { SiteFooter } from "../ui/site-footer";
 
 type StoredResult = {
   imageDataUrl: string;
   imageName: string;
   description: string;
 };
-
-const EXTENSION_DOWNLOAD_HREF = "/extension.zip";
 
 export default function ResultPage() {
   const [result, setResult] = useState<StoredResult | null>(null);
@@ -150,113 +146,7 @@ export default function ResultPage() {
         </section>
       </main>
 
-      <footer className="footer">
-        <section className="footer-cta" id="how">
-          <div className="footer-grid-pattern" aria-hidden="true" />
-          <div className="footer-cta-inner">
-            <SparkIcon className="cta-spark-icon" />
-            <h2>Let&apos;s get started on something great</h2>
-            <p>Join over 4,000+ startups already growing with Image Analyser.</p>
-
-            <div className="cta-actions">
-              <button type="button" className="cta-btn cta-btn-outline">
-                <PlayIcon className="button-icon" />
-                View demo
-              </button>
-              <button type="button" className="cta-btn cta-btn-primary">
-                Get started
-                <ArrowRightIcon className="button-icon" />
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section className="footer-links-wrap">
-          <div className="container footer-links-grid">
-            <div className="footer-col" id="pricing">
-              <h3>Product</h3>
-              <a href="#overview">Overview</a>
-              <a href="#features">Features</a>
-              <a href="#solutions">
-                Solutions <span className="new-pill">New</span>
-              </a>
-              <a href="#tutorials">Tutorials</a>
-              <a href="#pricing-plans">Pricing</a>
-              <a href="#releases">Releases</a>
-            </div>
-
-            <div className="footer-col">
-              <h3>Company</h3>
-              <a href="#about">About us</a>
-              <a href="#careers">Careers</a>
-              <a href="#press">Press</a>
-              <a href="#news">News</a>
-              <a href="#media-kit">Media kit</a>
-              <a href="#contact-company">Contact</a>
-            </div>
-
-            <div className="footer-col" id="api">
-              <h3>Resources</h3>
-              <a href="#blog">Blog</a>
-              <a href="#newsletter">Newsletter</a>
-              <a href="#events">Events</a>
-              <a href="#help">Help centre</a>
-              <a href="#guides">Tutorials</a>
-              <a href="#support">Support</a>
-            </div>
-
-            <div className="footer-col">
-              <h3>Social</h3>
-              <a href="#twitter">Twitter</a>
-              <a href="#linkedin">LinkedIn</a>
-              <a href="#facebook">Facebook</a>
-              <a href="#github">GitHub</a>
-              <a href="#angellist">AngelList</a>
-              <a href="#dribbble">Dribbble</a>
-            </div>
-
-            <div className="footer-col">
-              <h3>Legal</h3>
-              <a href="#terms">Terms</a>
-              <a href="#privacy">Privacy</a>
-              <a href="#cookies">Cookies</a>
-              <a href="#licenses">Licenses</a>
-              <a href="#settings">Settings</a>
-              <a href="#contact-legal">Contact</a>
-            </div>
-
-            <div className="footer-col footer-app-col">
-              <h3>Get extension</h3>
-              <a
-                href={EXTENSION_DOWNLOAD_HREF}
-                className="store-badge chrome-badge"
-                aria-label="Download Chrome Extension"
-                download
-              >
-                <span className="store-badge-row">
-                  <ChromeIcon className="store-icon" />
-                  <strong>Chrome Extension</strong>
-                </span>
-                <span>Download now</span>
-              </a>
-            </div>
-          </div>
-
-          <div className="container footer-bottom">
-            <a className="footer-brand" href="/" aria-label="Image to Prompt Generator">
-              <span className="ipg-brand">
-                <span className="ipg-brand-text">IPG</span>
-                <span className="ipg-brand-flow" aria-hidden="true">
-                  <ImageIcon className="ipg-flow-icon" />
-                  <ArrowRightIcon className="ipg-flow-arrow" />
-                  <FileTextIcon className="ipg-flow-icon" />
-                </span>
-              </span>
-            </a>
-            <p>(c) 2077 Image Analyser. All rights reserved.</p>
-          </div>
-        </section>
-      </footer>
+      <SiteFooter id="result-footer" />
     </div>
   );
 }

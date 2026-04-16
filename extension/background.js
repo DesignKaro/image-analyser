@@ -1,4 +1,4 @@
-const DEFAULT_BACKEND_URL = "http://127.0.0.1:8787";
+const DEFAULT_BACKEND_URL = "https://imagetopromptgenerator.one/backend";
 const LEGACY_LIVE_BACKEND_URL = "https://img.connectiqworld.cloud/backend";
 const LIVE_BACKEND_URL = "https://imagetopromptgenerator.one/backend";
 const OPENAI_MODEL = "gpt-4o-mini";
@@ -13,7 +13,7 @@ const MAX_FETCH_BYTES = 15 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 20000;
 const BACKEND_TIMEOUT_MS = 45000;
 const LOCALHOST_WEB_APP_URL = "http://localhost:3000";
-const LIVE_WEB_APP_URL = "https://imagetopromptgenerator.one";
+const LIVE_WEB_APP_URL = "https://imagetopromptgenerate.com";
 const GOOGLE_WEB_LOGIN_TIMEOUT_MS = 4 * 60 * 1000;
 const GOOGLE_WEB_LOGIN_POLL_MS = 1200;
 
@@ -219,7 +219,12 @@ function normalizeBackendUrl(rawUrl) {
     throw new Error("Backend URL must use http or https.");
   }
 
-  if ((parsed.hostname === "img.connectiqworld.cloud" || parsed.hostname === "imagetopromptgenerator.one") && parsed.protocol === "http:") {
+  if (
+    (parsed.hostname === "img.connectiqworld.cloud" ||
+      parsed.hostname === "imagetopromptgenerator.one" ||
+      parsed.hostname === "imagetopromptgenerate.com") &&
+    parsed.protocol === "http:"
+  ) {
     parsed.protocol = "https:";
   }
 
@@ -397,7 +402,7 @@ function resolveWebAppUrlFromBackend(backendUrl) {
   try {
     parsed = new URL(backendUrl);
   } catch {
-    return LOCALHOST_WEB_APP_URL;
+    return LIVE_WEB_APP_URL;
   }
 
   if (parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost") {
@@ -410,7 +415,11 @@ function resolveWebAppUrlFromBackend(backendUrl) {
     return parsed.toString();
   }
 
-  if (parsed.hostname === "img.connectiqworld.cloud" || parsed.hostname === "imagetopromptgenerator.one") {
+  if (
+    parsed.hostname === "img.connectiqworld.cloud" ||
+    parsed.hostname === "imagetopromptgenerator.one" ||
+    parsed.hostname === "imagetopromptgenerate.com"
+  ) {
     return LIVE_WEB_APP_URL;
   }
 
@@ -1240,6 +1249,7 @@ async function readLocalStorageValueFromTab(tabId, key) {
   try {
     const injectionResults = await executeScript({
       target: { tabId },
+      world: "MAIN",
       func: (storageKey) => {
         try {
           const raw = window.localStorage.getItem(storageKey);

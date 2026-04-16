@@ -44,7 +44,7 @@ const sections: LegalSection[] = [
   {
     title: "Vulnerability reporting",
     paragraphs: [
-      "If you identify a security concern, disclose it responsibly by emailing abhi@argro.co with reproduction details and impact."
+      "If you identify a security concern, disclose it responsibly by emailing imagetopromptgenerate@gmail.com with reproduction details and impact."
     ]
   },
   {

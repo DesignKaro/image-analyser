@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-off script: set password for bootstrap admin (argro.official@gmail.com).
+ * One-off script: set password for bootstrap admin (imagetopromptgenerate@gmail.com).
  * Uses same .env and hashing as server.mjs. Run from backend: node scripts/set-admin-password.mjs
  */
 import { randomBytes, scrypt as scryptCb } from "node:crypto";
@@ -38,7 +38,7 @@ async function main() {
   const envPath = path.join(__dirname, "..", ".env");
   loadDotEnv(envPath);
 
-  const email = (process.env.BOOTSTRAP_ADMIN_EMAILS || "argro.official@gmail.com").split(",")[0].trim();
+  const email = (process.env.BOOTSTRAP_ADMIN_EMAILS || "imagetopromptgenerate@gmail.com").split(",")[0].trim();
   const newPassword = (process.env.BOOTSTRAP_ADMIN_PASSWORD || "").trim();
   if (!newPassword) {
     console.error("Set BOOTSTRAP_ADMIN_PASSWORD in backend/.env and run again.");

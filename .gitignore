@@ -1,5 +1,6 @@
 # Dependencies
 node_modules/
+node_modules 2/
 
 # Environment and secrets (keep .env.example)
 .env
@@ -16,6 +17,9 @@ node_modules/
 dist/
 .cache/
 .next/
+.expo/
+mobile/.expo/
+mobile/.expo-shared/
 
 # Extension package (optional – remove to commit release zips)
 extension/*.zip

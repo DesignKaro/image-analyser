@@ -52,7 +52,7 @@ const sections: LegalSection[] = [
   {
     title: "Contact for privacy requests",
     paragraphs: [
-      "For privacy or data requests, email abhi@argro.co with the subject line Privacy Request."
+      "For privacy or data requests, email imagetopromptgenerate@gmail.com with the subject line Privacy Request."
     ]
   }
 ];

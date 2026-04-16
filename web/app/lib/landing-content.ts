@@ -322,6 +322,7 @@ const DEFAULT_EXAMPLES: ToolExampleItem[] = [
 
 /** 5 examples per page for the 6 non-homepage pages. Unique sets for SEO. */
 const EXAMPLES_SET_1 = DEFAULT_EXAMPLES.slice(0, 5);
+const EXAMPLES_SET_HOME = DEFAULT_EXAMPLES.slice(0, 6);
 const EXAMPLES_SET_2 = DEFAULT_EXAMPLES.slice(5, 10);
 const EXAMPLES_SET_3 = DEFAULT_EXAMPLES.slice(10, 15);
 const EXAMPLES_SET_4 = DEFAULT_EXAMPLES.slice(15, 20);
@@ -397,44 +398,53 @@ const DEFAULT_REVIEWS: ReviewItem[] = [
 const IMAGE_TO_PROMPT_DEFAULT: LandingContent = {
   heroImageUrl: "/Assets/3-2-cat-png-14.png",
   heroImageAlt: "Image to Prompt – upload a photo, get a text prompt for any AI",
-  heroLeftLine1: "Image to Prompt",
-  heroLeftLine2: "in a Few Clicks",
+  heroLeftLine1: "The World's Best",
+  heroLeftLine2: "Image to Prompt AI",
   heroMini:
-    "Free image to prompt generator: upload a photo, get a prompt. Paste it into ChatGPT, Midjourney, Gemini, or any AI—no account needed to try.",
-  heroRightLine1: "Convert Image to Prompt",
-  heroRightLine2: "Online in Seconds",
+    "No account? No problem. Just upload and go. Trusted by 44k+ creators worldwide.",
+  heroRightLine1: "Turn Your Inspiration Into Action.",
+  heroRightLine2: "Every Pixel Deserves a Prompt.",
   uploadSupportText:
-    "Drop a screenshot, product shot, or any image. Our image to prompt AI turns it into text you can use in ChatGPT, Gemini, Grok, Leonardo, and more.",
+    "Stop struggling with blank page syndrome. Whether you're using Google Gemini, Midjourney, or ChatGPT, our AI reads your image like a professional artist—capturing lighting, mood, and detail to deliver a Gemini AI Photo Prompt in under 3 seconds.",
   counterItems: [
     {
       value: "250K+",
-      label: "prompts generated",
-      description: "People use this image to prompt generator for product shots, social posts, and design refs."
+      label: "Prompts Perfected",
+      description:
+        "Join a global community of creators. From viral social posts to professional design briefs, our Image to Prompt AI has fueled a quarter-million creative ideas."
     },
     {
       value: "75K+",
-      label: "images analyzed",
-      description: "Screenshots, photos, and mockups turned into usable prompts."
+      label: "Images Transformed",
+      description:
+        "We have read everything from complex architectural mockups to simple product shots. Our engine specializes in generating the most accurate Google Gemini AI Photo Prompts available today."
     },
     {
-      value: "4+",
-      label: "AI tools supported",
-      description: "Copy your prompt into ChatGPT, Gemini, Grok, Leonardo, Midjourney, and more."
+      value: "10+",
+      label: "AI Models Supported",
+      description:
+        "Generate once, use everywhere. Your prompts are instantly compatible with ChatGPT, Gemini, Grok, Leonardo, Midjourney, and more. One tool, infinite destinations."
     }
   ],
   toolInterfaceKicker: "How It Works",
-  toolInterfaceH2: "Simple image to prompt converter: upload, generate, copy",
+  toolInterfaceH2: "Simple image to prompt converter: Upload, Generate, Copy",
   toolInterfaceIntro:
-    "Upload an image, hit generate, then copy or save the prompt. Your plan and credits show in the strip above so you know where you stand. Saved prompts live in your account for reuse.",
+    "Why spend hours learning prompt engineering when our AI can do it in seconds? Our streamlined workflow is designed for speed and precision. Whether you’re on the free plan or using our Bulk Image to Prompt feature, the process remains as easy as 1-2-3.",
   toolInterfaceCards: [
-    { title: "Upload", description: "Drag and drop or pick a file. JPG, PNG, WebP. Clear images give the best prompts." },
     {
-      title: "Generate",
-      description: "One click. The image to prompt AI reads the scene and writes a prompt you can edit before copying."
+      title: "Upload",
+      description:
+        "Bring Your Inspiration to Life. Drag and drop your files or pick a photo from your gallery. We support JPG, PNG, and WebP. For the best results, use clear images with good lighting—the more detail our AI can see, the better your Gemini AI Photo Prompt will be."
     },
     {
-      title: "Copy or save",
-      description: "Paste into ChatGPT, Midjourney, or any tool. Save the ones you want to use again."
+      title: "Generate",
+      description:
+        "Let the AI Do the Heavy Lifting. Click once and watch the magic happen. Our advanced AI Image Prompt Generator deep-scans your image to identify subjects, lighting styles, artistic moods, and camera angles. You can even edit the text before you finalize it to add your personal \"soul\" to the prompt."
+    },
+    {
+      title: "Copy or Save",
+      description:
+        "Ready for ChatGPT, Gemini, & More. One click to copy your prompt to your clipboard and paste it into your favorite AI tool. Want to keep a library of your best work? Log in to save your prompts for future use, so you never have to regenerate the same style twice."
     }
   ],
   howToUseKicker: "How To Use",
@@ -478,7 +488,7 @@ const IMAGE_TO_PROMPT_DEFAULT: LandingContent = {
   ],
   examplesKicker: "Example Results",
   examplesH2: "Image to prompt examples: input photo → generated text",
-  examples: [], // Homepage: no examples section
+  examples: EXAMPLES_SET_HOME,
   useCasesKicker: "Use Cases",
   useCasesH2: "Who uses this image to prompt tool",
   useCases: [
@@ -505,6 +515,14 @@ const IMAGE_TO_PROMPT_DEFAULT: LandingContent = {
     {
       title: "Marketing",
       description: "Product photos and brand visuals → consistent prompt briefs. Same style language across campaigns."
+    },
+    {
+      title: "Ecommerce listings",
+      description: "Turn product photos into prompt-ready descriptions for variations, background swaps, and consistent catalog imagery."
+    },
+    {
+      title: "Brand teams",
+      description: "Translate visual references into clear creative prompts so multiple teams can align on style and tone."
     }
   ],
   benefitsKicker: "Benefits",
@@ -1236,7 +1254,7 @@ const GEMINI_PROMPT: LandingContent = {
 const IMAGE_PROMPT_GENERATOR: LandingContent = {
   ...IMAGE_TO_PROMPT_DEFAULT,
   examples: EXAMPLES_SET_2,
-  heroImageUrl: "/Assets/3-2-cat-png-14.png",
+  heroImageUrl: "/Assets/excited-dark-haired-girl-red-jacket-having-fun-with-camera_197531-7697-removebg-preview.png",
   heroImageAlt: "Free image prompt generator – photo in, text prompt out for ChatGPT, Midjourney, Gemini",
   heroLeftLine1: "Image Prompt Generator",
   heroLeftLine2: "Free and Simple",
@@ -1374,6 +1392,56 @@ const IMAGE_TO_PROMPT_CONVERTER: LandingContent = {
     "Use our free image to prompt converter online. Upload an image, generate AI-ready prompts, and use them for ChatGPT, Midjourney, Gemini, and more."
 };
 
+function createModelLandingAlias(
+  schemaPageName: string,
+  schemaPagePath: string,
+  schemaAppDescription: string
+): LandingContent {
+  return {
+    ...IMAGE_TO_PROMPT_DEFAULT,
+    schemaPageName,
+    schemaPagePath,
+    schemaAppName: schemaPageName,
+    schemaAppDescription
+  };
+}
+
+const CHATGPT_IMAGE_TO_PROMPT = createModelLandingAlias(
+  "ChatGPT Image to Prompt",
+  "chatgpt-image-to-prompt",
+  "Convert an image to a ChatGPT-ready prompt. Upload a photo, generate structured prompt text, and paste it directly into ChatGPT."
+);
+
+const COPILOT_IMAGE_TO_PROMPT = createModelLandingAlias(
+  "Copilot Image to Prompt",
+  "copilot-image-to-prompt",
+  "Turn any image into a Copilot-ready prompt. Upload a photo, generate clean prompt text, and use it in Microsoft Copilot."
+);
+
+const META_AI_IMAGE_TO_PROMPT = createModelLandingAlias(
+  "Meta AI Image to Prompt",
+  "meta-ai-image-to-prompt",
+  "Generate a Meta AI-ready prompt from an image. Upload your photo, get a structured prompt, and reuse it in Meta AI workflows."
+);
+
+const GROK_IMAGE_TO_PROMPT = createModelLandingAlias(
+  "Grok Image to Prompt",
+  "grok-image-to-prompt",
+  "Create a Grok-ready prompt from an image in seconds. Upload a photo, generate detailed prompt text, and paste it into Grok."
+);
+
+const LEONARDO_IMAGE_TO_PROMPT = createModelLandingAlias(
+  "Leonardo Image to Prompt",
+  "leonardo-image-to-prompt",
+  "Convert image references into Leonardo-ready prompts. Upload a photo and generate prompt text tuned for Leonardo creative workflows."
+);
+
+const MIDJOURNEY_IMAGE_TO_PROMPT = createModelLandingAlias(
+  "Midjourney Image to Prompt",
+  "midjourney-image-to-prompt",
+  "Turn an image into a Midjourney-ready prompt. Upload a photo, generate detailed text, and use it in your Midjourney prompt flow."
+);
+
 const CONTENT_MAP: Record<string, LandingContent> = {
   "image-to-prompt": IMAGE_TO_PROMPT_DEFAULT,
   "image-to-prompt-converter": IMAGE_TO_PROMPT_CONVERTER,
@@ -1381,7 +1449,13 @@ const CONTENT_MAP: Record<string, LandingContent> = {
   "ai-gemini-photo-prompt": AI_GEMINI_PHOTO_PROMPT,
   "google-gemini-ai-photo-prompt": GOOGLE_GEMINI_AI_PHOTO_PROMPT,
   "gemini-prompt": GEMINI_PROMPT,
-  "image-prompt-generator": IMAGE_PROMPT_GENERATOR
+  "image-prompt-generator": IMAGE_PROMPT_GENERATOR,
+  "chatgpt-image-to-prompt": CHATGPT_IMAGE_TO_PROMPT,
+  "copilot-image-to-prompt": COPILOT_IMAGE_TO_PROMPT,
+  "meta-ai-image-to-prompt": META_AI_IMAGE_TO_PROMPT,
+  "grok-image-to-prompt": GROK_IMAGE_TO_PROMPT,
+  "leonardo-image-to-prompt": LEONARDO_IMAGE_TO_PROMPT,
+  "midjourney-image-to-prompt": MIDJOURNEY_IMAGE_TO_PROMPT
 };
 
 export function getLandingContent(variant: string): LandingContent {
@@ -1395,5 +1469,11 @@ export const LANDING_VARIANTS = [
   "ai-gemini-photo-prompt",
   "google-gemini-ai-photo-prompt",
   "gemini-prompt",
-  "image-prompt-generator"
+  "image-prompt-generator",
+  "chatgpt-image-to-prompt",
+  "copilot-image-to-prompt",
+  "meta-ai-image-to-prompt",
+  "grok-image-to-prompt",
+  "leonardo-image-to-prompt",
+  "midjourney-image-to-prompt"
 ] as const;

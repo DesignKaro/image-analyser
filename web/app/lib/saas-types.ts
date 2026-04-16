@@ -45,8 +45,17 @@ export type PricingPlanSnapshot = {
   monthlyQuota: number | null;
 };
 
+export type PricingTopupSnapshot = {
+  code: string;
+  credits: number;
+  amountSubunits: number;
+  pricePerCreditSubunits: number;
+  currency: string;
+};
+
 export type PricingContextSnapshot = {
   country: string;
   currency: string;
   plans: PricingPlanSnapshot[];
+  topups?: PricingTopupSnapshot[];
 };

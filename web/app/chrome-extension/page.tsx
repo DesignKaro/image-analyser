@@ -295,7 +295,7 @@ export default function ChromeExtensionPage() {
         <section className="container extension-contact">
           <h2>Need setup help or enterprise onboarding?</h2>
           <p>
-            Contact <a href="mailto:abhi@argro.co">abhi@argro.co</a> for support, implementation guidance, or custom
+            Contact <a href="mailto:imagetopromptgenerate@gmail.com">imagetopromptgenerate@gmail.com</a> for support, implementation guidance, or custom
             rollout requirements.
           </p>
         </section>

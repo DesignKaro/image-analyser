@@ -204,7 +204,7 @@ const FAQS_PAGE: FaqItem[] = [
   {
     question: "How do I contact support?",
     answer:
-      "Use the Help Center link in the footer or contact the email provided on the site (e.g. abhi@argro.co) for account, billing, or technical support. We aim to respond within a few business days."
+      "Use the Help Center link in the footer or contact the email provided on the site (e.g. imagetopromptgenerate@gmail.com) for account, billing, or technical support. We aim to respond within a few business days."
   },
   {
     question: "Can I use this for educational or nonprofit projects?",
