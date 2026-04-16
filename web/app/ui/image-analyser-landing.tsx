@@ -34,7 +34,6 @@ import {
   CloseIcon,
   CopyIcon,
   GoogleIcon,
-  ImageIcon,
   LayersIcon,
   SaveIcon,
   ServerIcon,
